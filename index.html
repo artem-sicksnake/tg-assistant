@@ -190,26 +190,66 @@ async function loadPayload() {
   payload = JSON.parse(new TextDecoder("utf-8").decode(b64bytes(legacy)));
 }
 
-function openPicker(i, field) {
-  const opts = field === "w" ? USERS : LISTS;
-  const cur = items[i][field];
+function listTree() {
+  const tree = {};
+  LISTS.forEach(full => {
+    const space = full.includes(" / ") ? full.split(" / ")[0] : "Другое";
+    (tree[space] = tree[space] || []).push(full);
+  });
+  return tree;
+}
+
+function shortList(full) {
+  return full.includes(" / ") ? full.split(" / ").slice(1).join(" / ") : full;
+}
+
+function makeSheet(title, rows, onPick) {
   const sheet = document.createElement("div");
   sheet.className = "sheet";
   sheet.innerHTML = `<div class="sheet-in">
-    <div class="sheet-title">${field === "w" ? "Исполнитель" : "Список ClickUp"}</div>
-    ${opts.map(o => `<div class="opt ${o === cur ? "sel" : ""}" data-v="${esc(o)}">
-      ${esc(o)}${o === cur ? " ✓" : ""}</div>`).join("")}
+    <div class="sheet-title">${title}</div>
+    ${rows.map(r => `<div class="opt ${r.sel ? "sel" : ""}" data-v="${esc(r.v)}">
+      ${esc(r.label)}${r.arrow ? ' <span style="color:var(--dim)">›</span>' : ""}${r.sel ? " ✓" : ""}</div>`).join("")}
   </div>`;
   sheet.onclick = (e) => {
     const opt = e.target.closest(".opt");
     if (opt) {
-      items[i][field] = opt.dataset.v;
-      render();
-      tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
+      sheet.remove();
+      onPick(opt.dataset.v);
+    } else if (e.target === sheet) {
+      sheet.remove();
     }
-    if (opt || e.target === sheet) sheet.remove();
   };
   document.body.appendChild(sheet);
+}
+
+function openPicker(i, field) {
+  if (field === "w") {
+    const cur = items[i].w;
+    makeSheet("Исполнитель",
+      USERS.map(o => ({ v: o, label: o, sel: o === cur })),
+      v => { items[i].w = v; render(); tg.HapticFeedback && tg.HapticFeedback.selectionChanged(); });
+    return;
+  }
+  const tree = listTree();
+  const cur = items[i].l;
+  const curSpace = cur.includes(" / ") ? cur.split(" / ")[0] : null;
+  const openLists = (space) => {
+    const rows = [{ v: "__back__", label: "‹ Все спейсы" }]
+      .concat(tree[space].map(f => ({ v: f, label: shortList(f), sel: f === cur })));
+    makeSheet(space, rows, v => {
+      if (v === "__back__") { openSpaces(); return; }
+      items[i].l = v;
+      render();
+      tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
+    });
+  };
+  const openSpaces = () => {
+    makeSheet("Спейс ClickUp",
+      Object.keys(tree).map(s => ({ v: s, label: s, arrow: true, sel: s === curSpace })),
+      openLists);
+  };
+  openSpaces();
 }
 
 function esc(s) {
@@ -246,7 +286,7 @@ function render() {
         <button class="chipsel" onclick="openPicker(${i},'w')">${esc(it.w)}</button>
         <input type="date" value="${it.du}" class="${it.du ? "" : "empty"}"
                onchange="items[${i}].du=this.value; this.classList.toggle('empty', !this.value)">
-        <button class="chipsel" onclick="openPicker(${i},'l')">${esc(it.l)}</button>
+        <button class="chipsel" onclick="openPicker(${i},'l')">${esc(shortList(it.l))}</button>
       </div>`;
     box.appendChild(div);
   });
