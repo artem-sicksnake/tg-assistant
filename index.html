@@ -188,6 +188,15 @@
     padding-left: 14px; position: relative; margin-bottom: 8px; }
   .wk-li::before { content: ""; position: absolute; left: 0; top: 7px; width: 5px; height: 5px;
     border-radius: 50%; background: var(--gold); }
+  .wk-strat { border-color: rgba(127,132,252,.35);
+    background: linear-gradient(180deg, rgba(127,132,252,.07), var(--card)); }
+  .wk-ov { position: fixed; inset: 0; z-index: 70; overflow-y: auto;
+    background: var(--bg, #0a0b0f); padding: 18px 16px 46px;
+    -webkit-overflow-scrolling: touch; animation: undoIn .25s; }
+  .wk-close { position: fixed; top: 14px; right: 14px; z-index: 71;
+    width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+    background: rgba(21,22,29,.94); border: 1px solid var(--line);
+    color: #fff; font-size: 17px; display: grid; place-items: center; }
 
   .sent-ov { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center;
     background: rgba(10,11,15,.72); backdrop-filter: blur(10px);
@@ -262,8 +271,9 @@
   <div class="hint">Пересборка анализирует только новое с прошлого раза, ~1–2 мин.<br>
   🎙 Голосовые правки: закрой редактор и просто надиктуй боту голосовое.</div>
   <div class="card stats" id="stats" style="display:none"></div>
-  <button class="ghost" id="wkbtn" onclick="askWeek()">📊 Аналитика недели</button>
-  <div class="hint" id="wkhint">Соберу последние 7 дней: статистика, закрытые таски,<br>разбор твоего общения. ~2–3 мин, пришлю кнопку с отчётом.</div>
+  <button class="ghost" id="wkopen" style="display:none">📊 Отчёт недели</button>
+  <button class="ghost" id="wkbtn" onclick="askWeek()">⟳ Собрать аналитику недели</button>
+  <div class="hint" id="wkhint">Статистика 7 дней, закрытые таски, разбор общения,<br>прогноз и стратегия. ~2–3 мин, пришлю кнопку с отчётом.</div>
   <div id="err" class="err"></div>
 </div>
 
@@ -656,10 +666,49 @@ function askWeek() {
 
 const WD = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
 
+function saveWeekCloud(wk) {
+  try {
+    if (!tg.CloudStorage) return;
+    const s = JSON.stringify(wk);
+    const parts = [];
+    for (let i = 0; i < s.length; i += 3800) parts.push(s.slice(i, i + 3800));
+    if (parts.length > 5) return;
+    tg.CloudStorage.setItem("wkn", String(parts.length), () => {});
+    parts.forEach((p, i) => tg.CloudStorage.setItem("wk" + i, p, () => {}));
+  } catch (e) {}
+}
+
+function loadWeekCloud(cb) {
+  if (!tg.CloudStorage) return cb(null);
+  try {
+    tg.CloudStorage.getItem("wkn", (e, n) => {
+      n = parseInt(n || "0", 10);
+      if (e || !n) return cb(null);
+      const keys = Array.from({ length: n }, (_, i) => "wk" + i);
+      tg.CloudStorage.getItems(keys, (e2, vals) => {
+        if (e2 || !vals) return cb(null);
+        try { cb(JSON.parse(keys.map(k => vals[k] || "").join(""))); }
+        catch (err) { cb(null); }
+      });
+    });
+  } catch (e) { cb(null); }
+}
+
+function openWeekOverlay(wk) {
+  tg.HapticFeedback && tg.HapticFeedback.impactOccurred("light");
+  const ov = document.createElement("div");
+  ov.className = "wk-ov";
+  ov.innerHTML = '<button class="wk-close">✕</button>' + weekHTML(wk);
+  ov.querySelector(".wk-close").onclick = () => ov.remove();
+  document.body.appendChild(ov);
+}
+
 function renderWeek(wk) {
+  document.getElementById("app").innerHTML = weekHTML(wk);
+}
+
+function weekHTML(wk) {
   const st = wk.st || {}, ai = wk.ai || {}, done = wk.done || [];
-  document.querySelector(".kicker").textContent = "Weekly · Analytics";
-  document.getElementById("h1").textContent = "Аналитика недели";
   const days = st.days || [];
   const period = days.length
     ? new Date(days[0][0] + "T12:00:00").toLocaleDateString("ru", { day: "numeric", month: "short" }) +
@@ -685,7 +734,7 @@ function renderWeek(wk) {
   const list = a => (a || []).map(x => `<div class="wk-li">${esc(x)}</div>`).join("");
   const tone = typeof ai.tone === "number" ? ai.tone : parseFloat(ai.tone) || 0;
 
-  document.getElementById("app").innerHTML = `
+  return `
     <div class="kicker">Weekly · Analytics</div>
     <h1>Аналитика недели</h1>
     <div class="hint" style="text-align:left; margin:-6px 0 14px;">${period} · только по запросу, ничего не создаёт</div>
@@ -704,6 +753,10 @@ function renderWeek(wk) {
       <div class="wk-txt">${esc(ai.tone_txt || "")}</div></div>
     <div class="card wk-card"><div class="wk-title">Итог недели</div>
       <div class="wk-txt">${esc(ai.sum || "")}</div></div>
+    ${ai.fc ? `<div class="card wk-card wk-strat"><div class="wk-title">🔮 Прогноз на 2–4 недели</div>
+      <div class="wk-txt">${esc(ai.fc)}</div></div>` : ""}
+    ${(ai.btl || []).length ? `<div class="card wk-card wk-strat"><div class="wk-title">🧱 Узкие места</div>${list(ai.btl)}</div>` : ""}
+    ${(ai.focus || []).length ? `<div class="card wk-card wk-strat"><div class="wk-title">🧭 Фокус на месяц</div>${list(ai.focus)}</div>` : ""}
     <div class="card wk-card"><div class="wk-title">💪 Сильное</div>${list(ai.plus)}</div>
     <div class="card wk-card"><div class="wk-title">🎯 Подтянуть</div>${list(ai.rec)}</div>`;
 }
@@ -744,7 +797,7 @@ function renderStats() {
   } catch (e) {
     document.getElementById("err").textContent = "Не смог прочитать данные: " + e.message;
   }
-  if (payload.wk) { renderWeek(payload.wk); return; }
+  if (payload.wk) { saveWeekCloud(payload.wk); renderWeek(payload.wk); return; }
   USERS = payload.u && payload.u.length ? payload.u : ["Я"];
   LISTS = payload.ls && payload.ls.length ? payload.ls : ["Default"];
   if (payload.d) {
@@ -771,6 +824,11 @@ function renderStats() {
   renderDigest();
   render(true);
   renderStats();
+  loadWeekCloud(wk => {
+    if (!wk) return;
+    const b = document.getElementById("wkopen");
+    if (b) { b.style.display = ""; b.onclick = () => openWeekOverlay(wk); }
+  });
 })();
 </script>
 </body>
