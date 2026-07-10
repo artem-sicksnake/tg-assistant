@@ -100,6 +100,17 @@
 
   .sheet { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.6);
     display: flex; align-items: flex-end; animation: fadein .18s; }
+  .sheet.top { align-items: flex-start; }
+  .sheet.top .sheet-in { height: 100% !important; max-height: none; border-radius: 0; }
+
+  .swipe-wrap { position: relative; }
+  .swipe-bg { position: absolute; inset: 0 0 12px 0; border-radius: 20px;
+    background: linear-gradient(90deg, transparent 35%, rgba(255,90,90,.22));
+    display: flex; align-items: center; justify-content: flex-end;
+    padding-right: 24px; color: #ff8a8a;
+    font: 600 13px -apple-system, system-ui, sans-serif;
+    opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .swipe-wrap.swiping .swipe-bg { opacity: 1; }
   @keyframes fadein { from { opacity: 0 } }
   .sheet-in { width: 100%; max-height: 78vh;
     position: relative; overflow: hidden; display: flex; flex-direction: column;
@@ -340,7 +351,6 @@ function render() {
                onchange="items[${i}].on=this.checked; softRender(${i}, this.checked)">`}
         <textarea class="title" rows="2"
           oninput="items[${i}].ti=this.value; ${dirty} updateButton()">${esc(it.ti)}</textarea>
-        ${!it.cr ? `<button class="clear" onclick="removeItem(${i})">✕</button>` : ""}
       </div>
       <div class="meta">
         <div class="fld"><span class="flab">исполнитель</span>
@@ -351,9 +361,49 @@ function render() {
         <div class="fld"><span class="flab">список</span>
           <button class="chipsel" onclick="openPicker(${i},'l')">${esc(shortList(it.l))}</button></div>
       </div>`;
-    box.appendChild(div);
+    const wrap = document.createElement("div");
+    wrap.className = "swipe-wrap";
+    wrap.innerHTML = `<div class="swipe-bg">🗑 Удалить</div>`;
+    wrap.appendChild(div);
+    attachSwipe(wrap, div, i);
+    box.appendChild(wrap);
   });
   updateButton();
+}
+
+function attachSwipe(wrap, card, i) {
+  let sx = 0, sy = 0, dx = 0, active = false, horiz = false;
+  card.addEventListener("touchstart", e => {
+    if (e.target.closest("textarea, input, button, select")) return;
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+    active = true; horiz = false; dx = 0;
+    card.style.transition = "none";
+  }, { passive: true });
+  card.addEventListener("touchmove", e => {
+    if (!active) return;
+    const tx = e.touches[0].clientX - sx, ty = e.touches[0].clientY - sy;
+    if (!horiz) {
+      if (Math.abs(tx) > 12 && Math.abs(tx) > Math.abs(ty) * 1.4) horiz = true;
+      else if (Math.abs(ty) > 12) { active = false; return; }
+      else return;
+    }
+    dx = Math.min(0, tx);
+    card.style.transform = `translateX(${dx}px)`;
+    wrap.classList.toggle("swiping", dx < -14);
+  }, { passive: true });
+  card.addEventListener("touchend", () => {
+    if (!active) return;
+    active = false;
+    card.style.transition = "transform .32s cubic-bezier(.22,.8,.3,1), opacity .32s";
+    if (dx < -90 && !items[i].cr) {
+      card.style.transform = "translateX(-115%)";
+      card.style.opacity = "0";
+      setTimeout(() => removeItem(i), 220);
+    } else {
+      card.style.transform = "";
+      wrap.classList.remove("swiping");
+    }
+  });
 }
 
 function softRender(i, on) {
@@ -374,11 +424,14 @@ function removeItem(i) {
 function addManual() {
   const draft = { ti: "", w: USERS[0], du: "", l: LISTS[0] };
   const sheet = document.createElement("div");
-  sheet.className = "sheet";
-  sheet.innerHTML = `<div class="sheet-in" style="height:${Math.round(window.innerHeight * 0.9)}px">
+  sheet.className = "sheet top";
+  sheet.innerHTML = `<div class="sheet-in">
     <div class="aura"><div class="aura-blob"></div></div>
     <div class="sheet-scroll">
-      <div class="sheet-title">Новая таска</div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <div class="sheet-title" style="padding-bottom:0">Новая таска</div>
+        <button class="clear" id="nt-close" style="font-size:22px; padding:6px 10px;">✕</button>
+      </div>
       <textarea id="nt-ti" rows="5" placeholder="Что нужно сделать…"
         style="width:100%; background:rgba(255,255,255,.05); border:1px solid var(--stroke);
         border-radius:16px; padding:14px; font:600 17px/1.4 -apple-system, system-ui, sans-serif;
@@ -416,6 +469,7 @@ function addManual() {
     sheet.remove();
     render();
   };
+  sheet.querySelector("#nt-close").onclick = () => sheet.remove();
   sheet.onclick = (e) => { if (e.target === sheet) sheet.remove(); };
   document.body.appendChild(sheet);
   setTimeout(() => sheet.querySelector("#nt-ti").focus(), 250);
