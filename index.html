@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Редактор тасков</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0b0f;
+    --glass: rgba(255,255,255,.055);
+    --glass-hi: rgba(255,255,255,.10);
+    --stroke: rgba(255,255,255,.10);
+    --stroke-hi: rgba(255,255,255,.22);
+    --text: #f4f2ed;
+    --dim: #9a9890;
+    --gold: #d9b878;
+    --gold-soft: rgba(217,184,120,.16);
+  }
+  * { box-sizing: border-box; margin: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 15px/1.45 "Manrope", -apple-system, sans-serif;
+    padding: 20px 14px 110px; overflow-x: hidden; position: relative;
+  }
+  /* атмосфера: два свечения + зерно */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(52% 38% at 82% -6%, rgba(217,184,120,.14), transparent 70%),
+      radial-gradient(60% 44% at -12% 104%, rgba(96,118,168,.16), transparent 70%);
+  }
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .05;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  #app { position: relative; z-index: 1; max-width: 560px; margin: 0 auto; }
+
+  .kicker {
+    font: 600 10px/1 "Unbounded", sans-serif; letter-spacing: .32em;
+    text-transform: uppercase; color: var(--gold); margin-bottom: 10px;
+  }
+  h1 {
+    font: 800 26px/1.15 "Unbounded", sans-serif; letter-spacing: -.01em;
+    margin-bottom: 6px;
+  }
+  .sub { color: var(--dim); font-size: 13.5px; margin-bottom: 22px; }
+  .sub b { color: var(--text); font-weight: 600; }
+
+  .task {
+    position: relative; border-radius: 20px; padding: 15px 15px 13px;
+    background: linear-gradient(160deg, var(--glass-hi), var(--glass) 45%);
+    border: 1px solid var(--stroke);
+    -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+    box-shadow: 0 18px 40px -22px rgba(0,0,0,.85);
+    margin-bottom: 12px;
+    opacity: 0; transform: translateY(14px);
+    animation: rise .55s cubic-bezier(.22,.8,.3,1) forwards;
+    transition: opacity .25s, filter .25s;
+  }
+  .task::before { /* блик по верхней кромке */
+    content: ""; position: absolute; inset: 0 12% auto 12%; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent);
+  }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  .task.off { opacity: .32; filter: saturate(.4); }
+  .task.off .title { text-decoration: line-through; text-decoration-color: var(--dim); }
+
+  .num {
+    position: absolute; top: -9px; right: 14px;
+    font: 600 10px/1 "Unbounded", sans-serif; letter-spacing: .12em;
+    color: var(--gold); background: #14130f;
+    border: 1px solid rgba(217,184,120,.45); border-radius: 99px; padding: 5px 9px;
+  }
+  .row1 { display: flex; gap: 12px; align-items: flex-start; }
+  .chk {
+    appearance: none; -webkit-appearance: none; flex: none; cursor: pointer;
+    width: 24px; height: 24px; margin-top: 4px; border-radius: 8px;
+    border: 1.5px solid var(--stroke-hi); background: rgba(255,255,255,.04);
+    display: grid; place-items: center; transition: all .2s;
+  }
+  .chk:checked { background: var(--gold); border-color: var(--gold); }
+  .chk:checked::after {
+    content: ""; width: 6px; height: 11px; margin-top: -2px;
+    border: solid #14130f; border-width: 0 2.5px 2.5px 0; transform: rotate(42deg);
+  }
+  textarea.title {
+    flex: 1; background: transparent; border: none; outline: none; resize: none;
+    color: var(--text); font: 600 15px/1.4 "Manrope", sans-serif; padding: 3px 0;
+  }
+  .clear { background: none; border: none; color: var(--dim); font-size: 17px; padding: 2px 4px; flex: none; }
+
+  .meta { display: flex; gap: 8px; margin-top: 11px; flex-wrap: wrap; align-items: center; }
+  select, input[type=date] {
+    appearance: none; -webkit-appearance: none; outline: none;
+    background: rgba(255,255,255,.05); color: var(--text);
+    border: 1px solid var(--stroke); border-radius: 11px;
+    padding: 7px 11px; font: 500 13px "Manrope", sans-serif; min-height: 34px;
+  }
+  select:focus, input[type=date]:focus, textarea.title:focus { border-color: rgba(217,184,120,.55); }
+  input[type=date].empty { color: var(--dim); }
+  .list-tag {
+    font: 600 10.5px/1 "Unbounded", sans-serif; letter-spacing: .08em;
+    color: var(--dim); text-transform: uppercase; padding: 8px 2px;
+  }
+
+  .ghost {
+    width: 100%; border-radius: 20px; padding: 15px; margin-top: 4px; cursor: pointer;
+    background: transparent; color: var(--dim);
+    border: 1.5px dashed rgba(255,255,255,.18);
+    font: 600 14px "Manrope", sans-serif; transition: all .2s;
+  }
+  .ghost:active { border-color: var(--gold); color: var(--gold); background: var(--gold-soft); }
+
+  .rerun {
+    width: 100%; margin-top: 18px; padding: 15px; cursor: pointer;
+    border-radius: 20px; border: 1px solid rgba(217,184,120,.4);
+    background: linear-gradient(160deg, rgba(217,184,120,.20), rgba(217,184,120,.06));
+    color: var(--gold); font: 600 13px "Unbounded", sans-serif; letter-spacing: .04em;
+    -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  }
+  .rerun:active { background: var(--gold-soft); }
+  .hint { color: var(--dim); font-size: 12px; margin-top: 8px; text-align: center; }
+  .err { color: #e07a6a; font-size: 13px; margin-top: 10px; text-align: center; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="kicker">Daily · Assistant</div>
+  <h1>Таски<br>за <span id="date">…</span></h1>
+  <div class="sub">Правь текст, исполнителя и срок. <b>Галочка</b> — что отправляем.</div>
+  <div id="list"></div>
+  <button class="ghost" onclick="addManual()">＋ Своя таска</button>
+  <button class="rerun" onclick="rerun()">⟳ Пересобрать сводку</button>
+  <div class="hint">Свежая выгрузка чатов + новый анализ, ~2–3 минуты, придёт в бот.</div>
+  <div id="err" class="err"></div>
+</div>
+
+<script>
+const tg = window.Telegram.WebApp;
+tg.ready(); tg.expand();
+tg.setHeaderColor("#0a0b0f"); tg.setBackgroundColor("#0a0b0f");
+
+let payload = { d: "", t: [], u: [], ls: [] };
+try {
+  const raw = location.hash.slice(1);
+  const bin = atob(raw.replace(/-/g, "+").replace(/_/g, "/"));
+  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  payload = JSON.parse(new TextDecoder("utf-8").decode(bytes));
+} catch (e) {
+  document.getElementById("err").textContent = "Не смог прочитать данные сводки: " + e.message;
+}
+const USERS = payload.u && payload.u.length ? payload.u : ["Я"];
+const LISTS = payload.ls && payload.ls.length ? payload.ls : ["Default"];
+const dEl = document.getElementById("date");
+dEl.textContent = payload.d
+  ? new Date(payload.d + "T12:00:00").toLocaleDateString("ru", { day: "numeric", month: "long" })
+  : "сегодня";
+
+const items = (payload.t || []).map(t => ({
+  n: t.n, ti: t.ti || "", w: t.w || "", du: t.du || "", l: t.l || "",
+  on: true, manual: false
+}));
+
+const selHtml = (opts, val) =>
+  opts.map(o => `<option ${o === val ? "selected" : ""}>${o}</option>`).join("");
+
+function render() {
+  const box = document.getElementById("list");
+  box.innerHTML = "";
+  items.forEach((it, i) => {
+    const div = document.createElement("div");
+    div.className = "task" + (it.on ? "" : " off");
+    div.style.animationDelay = (i * 60) + "ms";
+    div.innerHTML = `
+      <div class="num">${it.manual ? "NEW" : "№ " + it.n}</div>
+      <div class="row1">
+        <input type="checkbox" class="chk" ${it.on ? "checked" : ""}
+               onchange="items[${i}].on=this.checked; softRender(${i}, this.checked)">
+        <textarea class="title" rows="2"
+          oninput="items[${i}].ti=this.value; updateButton()">${it.ti}</textarea>
+        ${it.manual ? `<button class="clear" onclick="items.splice(${i},1);render()">✕</button>` : ""}
+      </div>
+      <div class="meta">
+        <select onchange="items[${i}].w=this.value">${selHtml(USERS, it.w)}</select>
+        <input type="date" value="${it.du}" class="${it.du ? "" : "empty"}"
+               onchange="items[${i}].du=this.value; this.classList.toggle('empty', !this.value)">
+        ${it.manual
+          ? `<select onchange="items[${i}].l=this.value">${selHtml(LISTS, it.l)}</select>`
+          : `<span class="list-tag">${it.l}</span>`}
+      </div>`;
+    box.appendChild(div);
+  });
+  updateButton();
+}
+
+function softRender(i, on) {
+  document.querySelectorAll(".task")[i].classList.toggle("off", !on);
+  updateButton();
+}
+
+function addManual() {
+  items.push({ n: 0, ti: "", w: USERS[0], du: "", l: LISTS[0], on: true, manual: true });
+  render();
+  const areas = document.querySelectorAll("textarea.title");
+  areas[areas.length - 1].focus();
+  if (navigator.vibrate) navigator.vibrate(10);
+}
+
+function updateButton() {
+  const cnt = items.filter(it => it.on && it.ti.trim()).length;
+  if (cnt) {
+    tg.MainButton.setParams({
+      text: `Отправить в ClickUp (${cnt})`,
+      color: "#d9b878", text_color: "#14130f", is_visible: true
+    });
+  } else {
+    tg.MainButton.hide();
+  }
+}
+
+tg.MainButton.onClick(() => {
+  const out = {
+    d: payload.d,
+    t: items.filter(it => it.on && !it.manual && it.ti.trim())
+            .map(it => ({ n: it.n, ti: it.ti.trim(), w: it.w, du: it.du })),
+    m: items.filter(it => it.on && it.manual && it.ti.trim())
+            .map(it => ({ ti: it.ti.trim(), w: it.w, du: it.du, l: it.l }))
+  };
+  const data = JSON.stringify(out);
+  if (data.length > 4000) {
+    document.getElementById("err").textContent = "Слишком много правок за раз, убери часть тасков.";
+    return;
+  }
+  tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
+  tg.sendData(data);
+});
+
+function rerun() {
+  tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
+  tg.sendData(JSON.stringify({ cmd: "run" }));
+}
+
+render();
+</script>
+</body>
+</html>
