@@ -105,19 +105,24 @@
   .sheet-scroll.anim-back { animation: slideBack .4s cubic-bezier(.22,.8,.3,1); }
   @keyframes slideFwd { from { opacity: 0; transform: translateX(28px); } }
   @keyframes slideBack { from { opacity: 0; transform: translateX(-28px); } }
-  .aura { position: absolute; width: 170%; height: 170%; left: -35%; top: 22%;
+  .aura { position: absolute; left: 50%; bottom: -30vh; width: 175vw; height: 52vh;
     pointer-events: none; will-change: transform;
-    transition: transform .85s cubic-bezier(.35,.9,.3,1); }
-  .sheet-in.lvl2 .aura { transform: translate(36%, -30%); }
-  .aura-blob { position: absolute; inset: 0; filter: blur(36px);
+    transform: translateX(-50%);
+    transform-origin: 50% 50%;
+    transition: transform .9s cubic-bezier(.35,.9,.3,1); }
+  .sheet-in.lvl2 .aura { transform: translateX(calc(-50% + 46vw)) rotate(-90deg); }
+  .aura-blob { position: absolute; inset: 0; filter: blur(26px);
     background:
-      radial-gradient(34% 30% at 42% 52%, rgba(127,132,252,.72), transparent 66%),
-      radial-gradient(28% 26% at 58% 60%, rgba(99,102,241,.58), transparent 68%),
-      radial-gradient(24% 22% at 48% 68%, rgba(120,140,190,.32), transparent 70%);
-    animation: aura 6s ease-in-out infinite alternate; }
+      radial-gradient(17% 44% at 10% 62%, rgba(127,132,252,.5), transparent 70%),
+      radial-gradient(15% 56% at 27% 74%, rgba(99,102,241,.55), transparent 70%),
+      radial-gradient(18% 40% at 46% 58%, rgba(127,132,252,.6), transparent 68%),
+      radial-gradient(14% 52% at 64% 72%, rgba(99,102,241,.48), transparent 70%),
+      radial-gradient(16% 42% at 81% 60%, rgba(127,132,252,.52), transparent 68%),
+      radial-gradient(13% 50% at 94% 72%, rgba(120,140,190,.35), transparent 70%);
+    animation: aura 8s ease-in-out infinite alternate; }
   @keyframes aura {
-    from { transform: translate(-3%, 1%) scale(1); }
-    to { transform: translate(3%, -1%) scale(1.14); }
+    from { transform: translateX(-2.5%) scaleY(1); }
+    to { transform: translateX(2.5%) scaleY(1.12); }
   }
   .sheet-title { font: 600 10px/1 -apple-system, "SF Pro Text", system-ui, sans-serif; letter-spacing: .2em;
     text-transform: uppercase; color: var(--dim); padding: 10px 6px 12px; }
