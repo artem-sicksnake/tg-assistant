@@ -394,7 +394,7 @@ function attachSwipe(wrap, card, i) {
   const ic = wrap.querySelector(".swipe-ic");
   let sx = 0, sy = 0, dx = 0, active = false, horiz = false;
   const reset = () => {
-    card.style.transform = "";
+    card.style.transform = "translateX(0)";
     bg.style.opacity = "0";
     ic.style.transform = "scale(.4)";
   };
@@ -403,6 +403,7 @@ function attachSwipe(wrap, card, i) {
     active = true; horiz = false; dx = 0;
     card.style.animation = "none";
     card.style.opacity = "1";
+    card.style.transform = "translateX(0)";
     card.style.transition = "none";
     bg.style.transition = "none";
   }, { passive: true });
