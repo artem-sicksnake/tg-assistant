@@ -243,6 +243,10 @@ function rowsHtml(title, rows) {
 }
 
 function openPicker(i, field) {
+  openPickerFor(items[i], field, () => render());
+}
+
+function openPickerFor(target, field, after) {
   const sheet = document.createElement("div");
   sheet.className = "sheet";
   sheet.innerHTML = `<div class="sheet-in"><div class="aura"><div class="aura-blob"></div></div><div class="sheet-scroll"></div></div>`;
@@ -251,7 +255,7 @@ function openPicker(i, field) {
   const haptic = () => tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
 
   const tree = listTree();
-  const curSpace = () => items[i].l.includes(" / ") ? items[i].l.split(" / ")[0] : null;
+  const curSpace = () => target.l.includes(" / ") ? target.l.split(" / ")[0] : null;
 
   const setContent = (html, dir) => {
     scroll.classList.remove("anim-fwd", "anim-back");
@@ -275,13 +279,13 @@ function openPicker(i, field) {
     inEl.classList.add("lvl2");
     setContent(rowsHtml(space,
       [{ v: "__back__", label: "‹ Все спейсы", kind: "back" }].concat(
-        tree[space].map(f => ({ v: f, label: shortList(f), sel: f === items[i].l, kind: "list" })))), dir);
+        tree[space].map(f => ({ v: f, label: shortList(f), sel: f === target.l, kind: "list" })))), dir);
   };
 
   inEl.style.transition = "none";
   if (field === "w") {
     setContent(rowsHtml("Исполнитель",
-      USERS.map(o => ({ v: o, label: o, sel: o === items[i].w, kind: "user" }))), null);
+      USERS.map(o => ({ v: o, label: o, sel: o === target.w, kind: "user" }))), null);
   } else {
     showSpaces(null);
   }
@@ -295,10 +299,10 @@ function openPicker(i, field) {
     }
     const { v, kind } = opt.dataset;
     haptic();
-    if (kind === "user") { items[i].w = v; items[i].dirty = true; sheet.remove(); render(); }
+    if (kind === "user") { target.w = v; target.dirty = true; sheet.remove(); after(); }
     else if (kind === "space") { showLists(v, "fwd"); }
     else if (kind === "back") { showSpaces("back"); }
-    else if (kind === "list") { items[i].l = v; items[i].dirty = true; sheet.remove(); render(); }
+    else if (kind === "list") { target.l = v; target.dirty = true; sheet.remove(); after(); }
   };
   document.body.appendChild(sheet);
 }
@@ -336,7 +340,7 @@ function render() {
                onchange="items[${i}].on=this.checked; softRender(${i}, this.checked)">`}
         <textarea class="title" rows="2"
           oninput="items[${i}].ti=this.value; ${dirty} updateButton()">${esc(it.ti)}</textarea>
-        ${it.manual ? `<button class="clear" onclick="items.splice(${i},1);render()">✕</button>` : ""}
+        ${!it.cr ? `<button class="clear" onclick="removeItem(${i})">✕</button>` : ""}
       </div>
       <div class="meta">
         <div class="fld"><span class="flab">исполнитель</span>
@@ -357,20 +361,73 @@ function softRender(i, on) {
   updateButton();
 }
 
-function addManual() {
-  items.push({ n: 0, ti: "", w: USERS[0], du: "", l: LISTS[0], on: true, manual: true });
+let removed = [];
+
+function removeItem(i) {
+  const it = items[i];
+  if (!it.manual && it.n) removed.push(it.n);
+  items.splice(i, 1);
+  tg.HapticFeedback && tg.HapticFeedback.impactOccurred("light");
   render();
-  const areas = document.querySelectorAll("textarea.title");
-  areas[areas.length - 1].focus();
+}
+
+function addManual() {
+  const draft = { ti: "", w: USERS[0], du: "", l: LISTS[0] };
+  const sheet = document.createElement("div");
+  sheet.className = "sheet";
+  sheet.innerHTML = `<div class="sheet-in" style="height:${Math.round(window.innerHeight * 0.9)}px">
+    <div class="aura"><div class="aura-blob"></div></div>
+    <div class="sheet-scroll">
+      <div class="sheet-title">Новая таска</div>
+      <textarea id="nt-ti" rows="5" placeholder="Что нужно сделать…"
+        style="width:100%; background:rgba(255,255,255,.05); border:1px solid var(--stroke);
+        border-radius:16px; padding:14px; font:600 17px/1.4 -apple-system, system-ui, sans-serif;
+        color:var(--text); outline:none; resize:none;"></textarea>
+      <div class="meta" style="margin-top:16px">
+        <div class="fld"><span class="flab">исполнитель</span>
+          <button class="chipsel" id="nt-w">${esc(draft.w)}</button></div>
+        <div class="fld"><span class="flab">срок</span>
+          <input type="date" id="nt-du" class="empty"></div>
+        <div class="fld"><span class="flab">список</span>
+          <button class="chipsel" id="nt-l">${esc(shortList(draft.l))}</button></div>
+      </div>
+      <button class="rerun" id="nt-add" style="margin-top:22px">＋ Добавить в список</button>
+    </div>
+  </div>`;
+  const refresh = () => {
+    sheet.querySelector("#nt-w").textContent = draft.w;
+    sheet.querySelector("#nt-l").textContent = shortList(draft.l);
+  };
+  sheet.querySelector("#nt-w").onclick = () => openPickerFor(draft, "w", refresh);
+  sheet.querySelector("#nt-l").onclick = () => openPickerFor(draft, "l", refresh);
+  sheet.querySelector("#nt-du").onchange = function () {
+    draft.du = this.value;
+    this.classList.toggle("empty", !this.value);
+  };
+  sheet.querySelector("#nt-ti").oninput = function () { draft.ti = this.value; };
+  sheet.querySelector("#nt-add").onclick = () => {
+    if (!draft.ti.trim()) {
+      sheet.querySelector("#nt-ti").focus();
+      return;
+    }
+    items.push({ n: 0, ti: draft.ti.trim(), w: draft.w, du: draft.du, l: draft.l,
+                 on: true, manual: true, dirty: false, cr: "" });
+    tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
+    sheet.remove();
+    render();
+  };
+  sheet.onclick = (e) => { if (e.target === sheet) sheet.remove(); };
+  document.body.appendChild(sheet);
+  setTimeout(() => sheet.querySelector("#nt-ti").focus(), 250);
 }
 
 const sendable = it => it.ti.trim() && (it.cr ? it.dirty : it.on);
 
 function updateButton() {
-  const cnt = items.filter(sendable).length;
+  const cnt = items.filter(sendable).length + removed.length;
   if (cnt) {
     tg.MainButton.setParams({
-      text: `Отправить в ClickUp (${cnt})`,
+      text: `Применить в ClickUp (${cnt})`,
       color: "#7f84fc", text_color: "#14130f", is_visible: true
     });
   } else {
@@ -384,7 +441,8 @@ tg.MainButton.onClick(() => {
     t: items.filter(it => !it.manual && sendable(it))
             .map(it => ({ n: it.n, ti: it.ti.trim(), w: it.w, du: it.du, l: it.l })),
     m: items.filter(it => it.manual && sendable(it))
-            .map(it => ({ ti: it.ti.trim(), w: it.w, du: it.du, l: it.l }))
+            .map(it => ({ ti: it.ti.trim(), w: it.w, du: it.du, l: it.l })),
+    x: removed
   };
   const data = JSON.stringify(out);
   if (data.length > 4000) {
