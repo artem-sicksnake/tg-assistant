@@ -54,10 +54,17 @@
   .digest-body .sec { color: var(--gold); font-weight: 700; }
 
   .task { padding: 15px 15px 13px; opacity: 0; transform: translateY(14px);
-    animation: rise .5s cubic-bezier(.22,.8,.3,1) forwards; transition: opacity .25s, filter .25s; }
+    animation: rise .5s cubic-bezier(.22,.8,.3,1) forwards;
+    transition: border-color .3s, background .3s, box-shadow .3s; }
   @keyframes rise { to { opacity: 1; transform: none; } }
-  .task.off { opacity: .32; filter: saturate(.4); }
-  .task.off .title { text-decoration: line-through; text-decoration-color: var(--dim); }
+  .task.sel {
+    border-color: rgba(217,184,120,.55);
+    background: linear-gradient(160deg, rgba(217,184,120,.14), rgba(217,184,120,.04) 55%),
+                linear-gradient(160deg, var(--glass-hi), var(--glass) 45%);
+    box-shadow: 0 0 0 1px rgba(217,184,120,.18), 0 18px 44px -20px rgba(217,184,120,.22),
+                0 18px 40px -22px rgba(0,0,0,.85);
+  }
+  .task.sel .num { border-color: var(--gold); box-shadow: 0 0 12px rgba(217,184,120,.35); }
   .num { position: absolute; top: -9px; right: 14px; font: 600 10px/1 "Unbounded", sans-serif;
     letter-spacing: .12em; color: var(--gold); background: #14130f;
     border: 1px solid rgba(217,184,120,.45); border-radius: 99px; padding: 5px 9px; }
@@ -79,6 +86,48 @@
   select:focus, input[type=date]:focus, textarea.title:focus { border-color: rgba(217,184,120,.55); }
   input[type=date].empty { color: var(--dim); }
 
+  .chipsel { background: rgba(255,255,255,.05); color: var(--text); cursor: pointer;
+    border: 1px solid var(--stroke); border-radius: 11px; padding: 7px 11px;
+    font: 500 13px "Manrope", sans-serif; min-height: 34px; max-width: 46vw;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chipsel:active { border-color: rgba(217,184,120,.55); }
+
+  .sheet { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.6);
+    display: flex; align-items: flex-end; animation: fadein .18s; }
+  @keyframes fadein { from { opacity: 0 } }
+  .sheet-in { width: 100%; max-height: 62vh; overflow-y: auto;
+    -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    background: #15161d; border-radius: 24px 24px 0 0; padding: 10px 14px 34px;
+    animation: up .22s cubic-bezier(.22,.8,.3,1); }
+  @keyframes up { from { transform: translateY(40px); opacity: .5 } }
+  .sheet-title { font: 600 10px/1 "Unbounded", sans-serif; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--dim); padding: 10px 6px 12px; }
+  .opt { padding: 14px 10px; border-radius: 12px; font: 500 15px "Manrope", sans-serif;
+    display: flex; justify-content: space-between; align-items: center; }
+  .opt:active { background: rgba(255,255,255,.06); }
+  .opt.sel { color: var(--gold); }
+
+  .stats { padding: 14px 15px 16px; }
+  .stats h3 { font: 600 12px/1 "Unbounded", sans-serif; letter-spacing: .1em;
+    text-transform: uppercase; margin-bottom: 14px; }
+  .metrics { display: flex; gap: 10px; margin-bottom: 16px; }
+  .metric { flex: 1; background: rgba(255,255,255,.04); border: 1px solid var(--stroke);
+    border-radius: 14px; padding: 10px 12px; }
+  .metric b { display: block; font: 800 22px/1.1 "Unbounded", sans-serif; color: var(--gold); }
+  .metric span { font-size: 11.5px; color: var(--dim); }
+  .brow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .bname { flex: 0 0 34%; font-size: 12px; color: #d9d7d0; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .btrack { flex: 1; height: 10px; border-radius: 6px; background: rgba(255,255,255,.05); }
+  .bfill { height: 100%; border-radius: 6px; width: 0;
+    background: linear-gradient(90deg, rgba(217,184,120,.5), var(--gold));
+    transition: width .7s cubic-bezier(.22,.8,.3,1); }
+  .bval { flex: 0 0 26px; font-size: 11.5px; color: var(--dim); text-align: right; }
+  .hours { display: flex; align-items: flex-end; gap: 2px; height: 52px; margin-top: 14px; }
+  .hbar { flex: 1; border-radius: 3px 3px 0 0; background: rgba(217,184,120,.35); min-height: 2px; }
+  .hlabels { display: flex; justify-content: space-between; font-size: 10px;
+    color: var(--dim); margin-top: 5px; }
+
   .ghost { width: 100%; border-radius: 20px; padding: 15px; margin-top: 4px; cursor: pointer;
     background: transparent; color: var(--dim); border: 1.5px dashed rgba(255,255,255,.18);
     font: 600 14px "Manrope", sans-serif; transition: all .2s; }
@@ -95,6 +144,7 @@
 <div id="app">
   <div class="kicker">Daily · Assistant</div>
   <h1 id="h1">Сводка</h1>
+  <div class="hint" style="text-align:left; margin:-6px 0 14px;">Отметь галочкой, что отправить в ClickUp. Текст, исполнителя и срок можно править.</div>
 
   <div class="card digest" id="digestCard" style="display:none">
     <div class="digest-head" onclick="this.parentNode.classList.toggle('open')">
@@ -108,6 +158,7 @@
   <button class="rerun" onclick="rerun()">⟳ Пересобрать сводку</button>
   <div class="hint">Пересборка анализирует только новое с прошлого раза, ~1–2 мин.<br>
   🎙 Голосовые правки: закрой редактор и просто надиктуй боту голосовое.</div>
+  <div class="card stats" id="stats" style="display:none"></div>
   <div id="err" class="err"></div>
 </div>
 
@@ -139,8 +190,27 @@ async function loadPayload() {
   payload = JSON.parse(new TextDecoder("utf-8").decode(b64bytes(legacy)));
 }
 
-const selHtml = (opts, val) =>
-  opts.map(o => `<option ${o === val ? "selected" : ""}>${o}</option>`).join("");
+function openPicker(i, field) {
+  const opts = field === "w" ? USERS : LISTS;
+  const cur = items[i][field];
+  const sheet = document.createElement("div");
+  sheet.className = "sheet";
+  sheet.innerHTML = `<div class="sheet-in">
+    <div class="sheet-title">${field === "w" ? "Исполнитель" : "Список ClickUp"}</div>
+    ${opts.map(o => `<div class="opt ${o === cur ? "sel" : ""}" data-v="${esc(o)}">
+      ${esc(o)}${o === cur ? " ✓" : ""}</div>`).join("")}
+  </div>`;
+  sheet.onclick = (e) => {
+    const opt = e.target.closest(".opt");
+    if (opt) {
+      items[i][field] = opt.dataset.v;
+      render();
+      tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
+    }
+    if (opt || e.target === sheet) sheet.remove();
+  };
+  document.body.appendChild(sheet);
+}
 
 function esc(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -161,7 +231,7 @@ function render() {
   box.innerHTML = "";
   items.forEach((it, i) => {
     const div = document.createElement("div");
-    div.className = "card task" + (it.on ? "" : " off");
+    div.className = "card task" + (it.on ? " sel" : "");
     div.style.animationDelay = (i * 50) + "ms";
     div.innerHTML = `
       <div class="num">${it.manual ? "NEW" : "№ " + it.n}</div>
@@ -173,10 +243,10 @@ function render() {
         ${it.manual ? `<button class="clear" onclick="items.splice(${i},1);render()">✕</button>` : ""}
       </div>
       <div class="meta">
-        <select onchange="items[${i}].w=this.value">${selHtml(USERS, it.w)}</select>
+        <button class="chipsel" onclick="openPicker(${i},'w')">${esc(it.w)}</button>
         <input type="date" value="${it.du}" class="${it.du ? "" : "empty"}"
                onchange="items[${i}].du=this.value; this.classList.toggle('empty', !this.value)">
-        <select onchange="items[${i}].l=this.value">${selHtml(LISTS, it.l)}</select>
+        <button class="chipsel" onclick="openPicker(${i},'l')">${esc(it.l)}</button>
       </div>`;
     box.appendChild(div);
   });
@@ -184,7 +254,7 @@ function render() {
 }
 
 function softRender(i, on) {
-  document.querySelectorAll(".task")[i].classList.toggle("off", !on);
+  document.querySelectorAll(".task")[i].classList.toggle("sel", on);
   updateButton();
 }
 
@@ -229,6 +299,36 @@ function rerun() {
   tg.sendData(JSON.stringify({ cmd: "run" }));
 }
 
+function renderStats() {
+  const st = payload.st;
+  if (!st || !st.tot) return;
+  const box = document.getElementById("stats");
+  box.style.display = "block";
+  const maxTop = Math.max(...st.top.map(t => t[1]), 1);
+  const maxHr = Math.max(...st.hrs, 1);
+  const pct = Math.round(st.me / st.tot * 100);
+  box.innerHTML = `
+    <h3>📊 Статистика дня</h3>
+    <div class="metrics">
+      <div class="metric"><b>${st.tot}</b><span>сообщений</span></div>
+      <div class="metric"><b>${st.me}</b><span>от тебя (${pct}%)</span></div>
+      <div class="metric"><b>${st.top.length ? esc(st.top[0][0].split(" ")[0]) : "—"}</b><span>самый горячий чат</span></div>
+    </div>
+    ${st.top.map(t => `
+      <div class="brow">
+        <div class="bname">${esc(t[0])}</div>
+        <div class="btrack"><div class="bfill" data-w="${Math.round(t[1] / maxTop * 100)}"></div></div>
+        <div class="bval">${t[1]}</div>
+      </div>`).join("")}
+    <div class="hours">${st.hrs.map(h =>
+      `<div class="hbar" style="height:${Math.max(4, Math.round(h / maxHr * 100))}%;
+        ${h === maxHr ? "background:var(--gold);" : ""}"></div>`).join("")}</div>
+    <div class="hlabels"><span>0</span><span>6</span><span>12</span><span>18</span><span>23</span></div>`;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    box.querySelectorAll(".bfill").forEach(el => el.style.width = el.dataset.w + "%");
+  }));
+}
+
 (async () => {
   try {
     await loadPayload();
@@ -243,10 +343,11 @@ function rerun() {
   }
   items = (payload.t || []).map(t => ({
     n: t.n, ti: t.ti || "", w: t.w || USERS[0], du: t.du || "",
-    l: t.l || LISTS[0], on: true, manual: false
+    l: t.l || LISTS[0], on: false, manual: false
   }));
   renderDigest();
   render();
+  renderStats();
 })();
 </script>
 </body>
