@@ -105,12 +105,13 @@
 
   .swipe-wrap { position: relative; }
   .swipe-bg { position: absolute; inset: 0 0 12px 0; border-radius: 20px;
-    background: linear-gradient(90deg, transparent 35%, rgba(255,90,90,.22));
+    background: linear-gradient(90deg, transparent 25%, rgba(255,70,70,.5));
     display: flex; align-items: center; justify-content: flex-end;
-    padding-right: 24px; color: #ff8a8a;
-    font: 600 13px -apple-system, system-ui, sans-serif;
-    opacity: 0; transition: opacity .2s; pointer-events: none; }
-  .swipe-wrap.swiping .swipe-bg { opacity: 1; }
+    padding-right: 20px; opacity: 0; pointer-events: none; }
+  .swipe-ic { width: 36px; height: 36px; border-radius: 50%; background: #ff5a5a;
+    color: #fff; display: grid; place-items: center;
+    font: 800 16px/1 -apple-system, system-ui, sans-serif;
+    transform: scale(.4); }
   @keyframes fadein { from { opacity: 0 } }
   .sheet-in { width: 100%; max-height: 78vh;
     position: relative; overflow: hidden; display: flex; flex-direction: column;
@@ -363,7 +364,7 @@ function render() {
       </div>`;
     const wrap = document.createElement("div");
     wrap.className = "swipe-wrap";
-    wrap.innerHTML = `<div class="swipe-bg">🗑 Удалить</div>`;
+    wrap.innerHTML = `<div class="swipe-bg"><div class="swipe-ic">✕</div></div>`;
     wrap.appendChild(div);
     attachSwipe(wrap, div, i);
     box.appendChild(wrap);
@@ -372,36 +373,51 @@ function render() {
 }
 
 function attachSwipe(wrap, card, i) {
+  const bg = wrap.querySelector(".swipe-bg");
+  const ic = wrap.querySelector(".swipe-ic");
   let sx = 0, sy = 0, dx = 0, active = false, horiz = false;
+  const reset = () => {
+    card.style.transform = "";
+    bg.style.opacity = "0";
+    ic.style.transform = "scale(.4)";
+  };
   card.addEventListener("touchstart", e => {
-    if (e.target.closest("textarea, input, button, select")) return;
     sx = e.touches[0].clientX; sy = e.touches[0].clientY;
     active = true; horiz = false; dx = 0;
     card.style.transition = "none";
+    bg.style.transition = "none";
   }, { passive: true });
   card.addEventListener("touchmove", e => {
     if (!active) return;
     const tx = e.touches[0].clientX - sx, ty = e.touches[0].clientY - sy;
     if (!horiz) {
-      if (Math.abs(tx) > 12 && Math.abs(tx) > Math.abs(ty) * 1.4) horiz = true;
+      if (Math.abs(tx) > 10 && Math.abs(tx) > Math.abs(ty) * 1.3) horiz = true;
       else if (Math.abs(ty) > 12) { active = false; return; }
       else return;
     }
     dx = Math.min(0, tx);
     card.style.transform = `translateX(${dx}px)`;
-    wrap.classList.toggle("swiping", dx < -14);
+    const p = Math.min(1, -dx / 90);
+    bg.style.opacity = p;
+    ic.style.transform = `scale(${0.4 + 0.65 * p})`;
+    if (p >= 1 && !ic.dataset.armed) {
+      ic.dataset.armed = "1";
+      tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
+    } else if (p < 1) {
+      delete ic.dataset.armed;
+    }
   }, { passive: true });
   card.addEventListener("touchend", () => {
     if (!active) return;
     active = false;
     card.style.transition = "transform .32s cubic-bezier(.22,.8,.3,1), opacity .32s";
+    bg.style.transition = "opacity .3s";
     if (dx < -90 && !items[i].cr) {
       card.style.transform = "translateX(-115%)";
       card.style.opacity = "0";
       setTimeout(() => removeItem(i), 220);
     } else {
-      card.style.transform = "";
-      wrap.classList.remove("swiping");
+      reset();
     }
   });
 }
