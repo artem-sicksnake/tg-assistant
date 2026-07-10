@@ -78,7 +78,14 @@
   textarea.title { flex: 1; background: transparent; border: none; outline: none; resize: none;
     color: var(--text); font: 600 15px/1.4 -apple-system, "SF Pro Text", system-ui, sans-serif; padding: 3px 0; }
   .clear { background: none; border: none; color: var(--dim); font-size: 17px; padding: 2px 4px; flex: none; }
-  .meta { display: flex; gap: 8px; margin-top: 11px; flex-wrap: wrap; align-items: center; }
+  .meta { display: flex; gap: 8px; margin-top: 11px; flex-wrap: wrap; align-items: flex-end; }
+  .fld { display: flex; flex-direction: column; }
+  .flab { font: 600 9px/1 -apple-system, "SF Pro Text", system-ui, sans-serif;
+    letter-spacing: .09em; text-transform: uppercase; color: var(--dim);
+    opacity: .65; margin: 0 0 5px 3px; }
+  .chk-done { width: 24px; height: 24px; margin-top: 4px; border-radius: 8px; flex: none;
+    background: rgba(127,132,252,.22); border: 1.5px solid rgba(127,132,252,.5);
+    display: grid; place-items: center; color: var(--gold); font-size: 13px; font-weight: 800; }
   select, input[type=date] { appearance: none; -webkit-appearance: none; outline: none;
     background: rgba(255,255,255,.05); color: var(--text); border: 1px solid var(--stroke);
     border-radius: 11px; padding: 7px 11px; font: 500 13px -apple-system, "SF Pro Text", system-ui, sans-serif; min-height: 34px; }
@@ -288,10 +295,10 @@ function openPicker(i, field) {
     }
     const { v, kind } = opt.dataset;
     haptic();
-    if (kind === "user") { items[i].w = v; sheet.remove(); render(); }
+    if (kind === "user") { items[i].w = v; items[i].dirty = true; sheet.remove(); render(); }
     else if (kind === "space") { showLists(v, "fwd"); }
     else if (kind === "back") { showSpaces("back"); }
-    else if (kind === "list") { items[i].l = v; sheet.remove(); render(); }
+    else if (kind === "list") { items[i].l = v; items[i].dirty = true; sheet.remove(); render(); }
   };
   document.body.appendChild(sheet);
 }
@@ -315,24 +322,30 @@ function render() {
   box.innerHTML = "";
   items.forEach((it, i) => {
     const div = document.createElement("div");
-    div.className = "card task" + (it.on ? " sel" : "");
+    div.className = "card task" + ((it.on || it.cr) ? " sel" : "");
     div.style.animationDelay = (i * 50) + "ms";
+    const dirty = `items[${i}].dirty=true;`;
     div.innerHTML = `
       <div class="num ${it.cr ? "done" : ""}" ${it.cr && it.cr.length > 2
         ? `onclick="tg.openLink('${esc(it.cr)}')"` : ""}>${
         it.manual ? "NEW" : (it.cr ? "✓ № " + it.n + " · в ClickUp" : "№ " + it.n)}</div>
       <div class="row1">
-        <input type="checkbox" class="chk" ${it.on ? "checked" : ""}
-               onchange="items[${i}].on=this.checked; softRender(${i}, this.checked)">
+        ${it.cr
+          ? `<div class="chk-done">✓</div>`
+          : `<input type="checkbox" class="chk" ${it.on ? "checked" : ""}
+               onchange="items[${i}].on=this.checked; softRender(${i}, this.checked)">`}
         <textarea class="title" rows="2"
-          oninput="items[${i}].ti=this.value; updateButton()">${esc(it.ti)}</textarea>
+          oninput="items[${i}].ti=this.value; ${dirty} updateButton()">${esc(it.ti)}</textarea>
         ${it.manual ? `<button class="clear" onclick="items.splice(${i},1);render()">✕</button>` : ""}
       </div>
       <div class="meta">
-        <button class="chipsel" onclick="openPicker(${i},'w')">${esc(it.w)}</button>
-        <input type="date" value="${it.du}" class="${it.du ? "" : "empty"}"
-               onchange="items[${i}].du=this.value; this.classList.toggle('empty', !this.value)">
-        <button class="chipsel" onclick="openPicker(${i},'l')">${esc(shortList(it.l))}</button>
+        <div class="fld"><span class="flab">исполнитель</span>
+          <button class="chipsel" onclick="openPicker(${i},'w')">${esc(it.w)}</button></div>
+        <div class="fld"><span class="flab">срок</span>
+          <input type="date" value="${it.du}" class="${it.du ? "" : "empty"}"
+               onchange="items[${i}].du=this.value; ${dirty} updateButton(); this.classList.toggle('empty', !this.value)"></div>
+        <div class="fld"><span class="flab">список</span>
+          <button class="chipsel" onclick="openPicker(${i},'l')">${esc(shortList(it.l))}</button></div>
       </div>`;
     box.appendChild(div);
   });
@@ -351,8 +364,10 @@ function addManual() {
   areas[areas.length - 1].focus();
 }
 
+const sendable = it => it.ti.trim() && (it.cr ? it.dirty : it.on);
+
 function updateButton() {
-  const cnt = items.filter(it => it.on && it.ti.trim()).length;
+  const cnt = items.filter(sendable).length;
   if (cnt) {
     tg.MainButton.setParams({
       text: `Отправить в ClickUp (${cnt})`,
@@ -366,9 +381,9 @@ function updateButton() {
 tg.MainButton.onClick(() => {
   const out = {
     d: payload.d,
-    t: items.filter(it => it.on && !it.manual && it.ti.trim())
+    t: items.filter(it => !it.manual && sendable(it))
             .map(it => ({ n: it.n, ti: it.ti.trim(), w: it.w, du: it.du, l: it.l })),
-    m: items.filter(it => it.on && it.manual && it.ti.trim())
+    m: items.filter(it => it.manual && sendable(it))
             .map(it => ({ ti: it.ti.trim(), w: it.w, du: it.du, l: it.l }))
   };
   const data = JSON.stringify(out);
@@ -429,7 +444,7 @@ function renderStats() {
   }
   items = (payload.t || []).map(t => ({
     n: t.n, ti: t.ti || "", w: t.w || USERS[0], du: t.du || "",
-    l: t.l || LISTS[0], on: false, manual: false, cr: t.cr || ""
+    l: t.l || LISTS[0], on: false, manual: false, cr: t.cr || "", dirty: false
   }));
   renderDigest();
   render();
