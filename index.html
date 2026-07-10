@@ -95,11 +95,25 @@
   .sheet { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.6);
     display: flex; align-items: flex-end; animation: fadein .18s; }
   @keyframes fadein { from { opacity: 0 } }
-  .sheet-in { width: 100%; max-height: 62vh; overflow-y: auto;
-    -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
-    background: #15161d; border-radius: 24px 24px 0 0; padding: 10px 14px 34px;
+  .sheet-in { width: 100%; min-height: 54vh; max-height: 76vh;
+    position: relative; overflow: hidden; display: flex; flex-direction: column;
+    background: #15161d; border-radius: 24px 24px 0 0;
     animation: up .22s cubic-bezier(.22,.8,.3,1); }
   @keyframes up { from { transform: translateY(40px); opacity: .5 } }
+  .sheet-scroll { position: relative; z-index: 1; overflow-y: auto;
+    -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    padding: 10px 14px 44px; }
+  .aura { position: absolute; left: -20%; right: -20%; bottom: -28%; height: 62%;
+    pointer-events: none; filter: blur(42px); opacity: .8;
+    background:
+      radial-gradient(50% 60% at 28% 78%, rgba(217,184,120,.38), transparent 70%),
+      radial-gradient(46% 56% at 74% 88%, rgba(166,120,62,.30), transparent 70%),
+      radial-gradient(40% 50% at 52% 100%, rgba(96,118,168,.18), transparent 70%);
+    animation: aura 7s ease-in-out infinite alternate; }
+  @keyframes aura {
+    from { transform: translateX(-5%) scale(1); }
+    to { transform: translateX(5%) scale(1.18) rotate(3deg); }
+  }
   .sheet-title { font: 600 10px/1 "Unbounded", sans-serif; letter-spacing: .2em;
     text-transform: uppercase; color: var(--dim); padding: 10px 6px 12px; }
   .opt { padding: 14px 10px; border-radius: 12px; font: 500 15px "Manrope", sans-serif;
@@ -207,9 +221,12 @@ function makeSheet(title, rows, onPick) {
   const sheet = document.createElement("div");
   sheet.className = "sheet";
   sheet.innerHTML = `<div class="sheet-in">
-    <div class="sheet-title">${title}</div>
-    ${rows.map(r => `<div class="opt ${r.sel ? "sel" : ""}" data-v="${esc(r.v)}">
-      ${esc(r.label)}${r.arrow ? ' <span style="color:var(--dim)">›</span>' : ""}${r.sel ? " ✓" : ""}</div>`).join("")}
+    <div class="aura"></div>
+    <div class="sheet-scroll">
+      <div class="sheet-title">${title}</div>
+      ${rows.map(r => `<div class="opt ${r.sel ? "sel" : ""}" data-v="${esc(r.v)}">
+        ${esc(r.label)}${r.arrow ? ' <span style="color:var(--dim)">›</span>' : ""}${r.sel ? " ✓" : ""}</div>`).join("")}
+    </div>
   </div>`;
   sheet.onclick = (e) => {
     const opt = e.target.closest(".opt");
