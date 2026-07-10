@@ -105,23 +105,19 @@
   .sheet-scroll.anim-back { animation: slideBack .4s cubic-bezier(.22,.8,.3,1); }
   @keyframes slideFwd { from { opacity: 0; transform: translateX(28px); } }
   @keyframes slideBack { from { opacity: 0; transform: translateX(-28px); } }
-  .aura { position: absolute; left: -25%; right: -25%; bottom: -18%; height: 95%;
-    pointer-events: none; filter: blur(34px); opacity: 1;
+  .aura { position: absolute; width: 170%; height: 170%; left: -35%; top: 22%;
+    pointer-events: none; will-change: transform;
+    transition: transform .85s cubic-bezier(.35,.9,.3,1); }
+  .sheet-in.lvl2 .aura { transform: translate(36%, -30%); }
+  .aura-blob { position: absolute; inset: 0; filter: blur(36px);
     background:
-      radial-gradient(52% 58% at 26% 82%, rgba(217,184,120,.75), transparent 68%),
-      radial-gradient(48% 55% at 76% 92%, rgba(196,140,66,.6), transparent 68%),
-      radial-gradient(42% 48% at 52% 105%, rgba(120,140,190,.35), transparent 70%);
-    -webkit-mask-image: linear-gradient(to top, black 55%, transparent 100%);
-    mask-image: linear-gradient(to top, black 55%, transparent 100%);
-    animation: aura 6s ease-in-out infinite alternate;
-    transition: left .65s cubic-bezier(.3,.9,.3,1), right .65s cubic-bezier(.3,.9,.3,1),
-                bottom .65s cubic-bezier(.3,.9,.3,1), height .65s cubic-bezier(.3,.9,.3,1); }
-  .sheet-in.lvl2 .aura { left: 48%; right: -42%; bottom: -8%; height: 118%;
-    -webkit-mask-image: linear-gradient(to left, black 45%, transparent 100%);
-    mask-image: linear-gradient(to left, black 45%, transparent 100%); }
+      radial-gradient(34% 30% at 42% 52%, rgba(217,184,120,.72), transparent 66%),
+      radial-gradient(28% 26% at 58% 60%, rgba(196,140,66,.58), transparent 68%),
+      radial-gradient(24% 22% at 48% 68%, rgba(120,140,190,.32), transparent 70%);
+    animation: aura 6s ease-in-out infinite alternate; }
   @keyframes aura {
-    from { transform: translateX(-7%) scale(1); }
-    to { transform: translateX(7%) scale(1.22) rotate(4deg); }
+    from { transform: translate(-3%, 1%) scale(1); }
+    to { transform: translate(3%, -1%) scale(1.14); }
   }
   .sheet-title { font: 600 10px/1 -apple-system, "SF Pro Text", system-ui, sans-serif; letter-spacing: .2em;
     text-transform: uppercase; color: var(--dim); padding: 10px 6px 12px; }
@@ -235,7 +231,7 @@ function rowsHtml(title, rows) {
 function openPicker(i, field) {
   const sheet = document.createElement("div");
   sheet.className = "sheet";
-  sheet.innerHTML = `<div class="sheet-in"><div class="aura"></div><div class="sheet-scroll"></div></div>`;
+  sheet.innerHTML = `<div class="sheet-in"><div class="aura"><div class="aura-blob"></div></div><div class="sheet-scroll"></div></div>`;
   const inEl = sheet.firstElementChild;
   const scroll = inEl.querySelector(".sheet-scroll");
   const haptic = () => tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
@@ -250,7 +246,9 @@ function openPicker(i, field) {
     if (dir) scroll.classList.add(dir === "fwd" ? "anim-fwd" : "anim-back");
     scroll.scrollTop = 0;
     const wh = window.innerHeight;
-    const target = Math.min(Math.max(scroll.scrollHeight + 6, wh * 0.54), wh * 0.76);
+    const contentH = Array.from(scroll.children)
+      .reduce((a, el) => a + el.offsetHeight, 0) + 60;
+    const target = Math.min(Math.max(contentH, wh * 0.54), wh * 0.76);
     inEl.style.height = target + "px";
   };
 
