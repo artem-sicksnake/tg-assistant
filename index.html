@@ -108,7 +108,9 @@
       radial-gradient(42% 48% at 52% 105%, rgba(120,140,190,.35), transparent 70%);
     -webkit-mask-image: linear-gradient(to top, black 55%, transparent 100%);
     mask-image: linear-gradient(to top, black 55%, transparent 100%);
-    animation: aura 6s ease-in-out infinite alternate; }
+    animation: aura 6s ease-in-out infinite alternate;
+    transition: left .6s cubic-bezier(.22,.8,.3,1), right .6s cubic-bezier(.22,.8,.3,1); }
+  .sheet-in.lvl2 .aura { left: 30%; right: -80%; }
   @keyframes aura {
     from { transform: translateX(-7%) scale(1); }
     to { transform: translateX(7%) scale(1.22) rotate(4deg); }
@@ -216,56 +218,58 @@ function shortList(full) {
   return full.includes(" / ") ? full.split(" / ").slice(1).join(" / ") : full;
 }
 
-function makeSheet(title, rows, onPick) {
-  const sheet = document.createElement("div");
-  sheet.className = "sheet";
-  sheet.innerHTML = `<div class="sheet-in">
-    <div class="aura"></div>
-    <div class="sheet-scroll">
-      <div class="sheet-title">${title}</div>
-      ${rows.map(r => `<div class="opt ${r.sel ? "sel" : ""}" data-v="${esc(r.v)}">
-        ${esc(r.label)}${r.arrow ? ' <span style="color:var(--dim)">›</span>' : ""}${r.sel ? " ✓" : ""}</div>`).join("")}
-    </div>
-  </div>`;
-  sheet.onclick = (e) => {
-    const opt = e.target.closest(".opt");
-    if (opt) {
-      sheet.remove();
-      onPick(opt.dataset.v);
-    } else if (e.target === sheet) {
-      sheet.remove();
-    }
-  };
-  document.body.appendChild(sheet);
+function rowsHtml(title, rows) {
+  return `<div class="sheet-title">${title}</div>` +
+    rows.map(r => `<div class="opt ${r.sel ? "sel" : ""}" data-v="${esc(r.v)}" data-kind="${r.kind}">
+      ${esc(r.label)}${r.arrow ? ' <span style="color:var(--dim)">›</span>' : ""}${r.sel ? " ✓" : ""}</div>`).join("");
 }
 
 function openPicker(i, field) {
-  if (field === "w") {
-    const cur = items[i].w;
-    makeSheet("Исполнитель",
-      USERS.map(o => ({ v: o, label: o, sel: o === cur })),
-      v => { items[i].w = v; render(); tg.HapticFeedback && tg.HapticFeedback.selectionChanged(); });
-    return;
-  }
+  const sheet = document.createElement("div");
+  sheet.className = "sheet";
+  sheet.innerHTML = `<div class="sheet-in"><div class="aura"></div><div class="sheet-scroll"></div></div>`;
+  const inEl = sheet.firstElementChild;
+  const scroll = inEl.querySelector(".sheet-scroll");
+  const haptic = () => tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
+
   const tree = listTree();
-  const cur = items[i].l;
-  const curSpace = cur.includes(" / ") ? cur.split(" / ")[0] : null;
-  const openLists = (space) => {
-    const rows = [{ v: "__back__", label: "‹ Все спейсы" }]
-      .concat(tree[space].map(f => ({ v: f, label: shortList(f), sel: f === cur })));
-    makeSheet(space, rows, v => {
-      if (v === "__back__") { openSpaces(); return; }
-      items[i].l = v;
-      render();
-      tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
-    });
+  const curSpace = () => items[i].l.includes(" / ") ? items[i].l.split(" / ")[0] : null;
+
+  const showSpaces = () => {
+    inEl.classList.remove("lvl2");
+    scroll.innerHTML = rowsHtml("Спейс ClickUp",
+      Object.keys(tree).map(s => ({ v: s, label: s, arrow: true, sel: s === curSpace(), kind: "space" })));
+    scroll.scrollTop = 0;
   };
-  const openSpaces = () => {
-    makeSheet("Спейс ClickUp",
-      Object.keys(tree).map(s => ({ v: s, label: s, arrow: true, sel: s === curSpace })),
-      openLists);
+  const showLists = (space) => {
+    inEl.classList.add("lvl2");
+    scroll.innerHTML = rowsHtml(space,
+      [{ v: "__back__", label: "‹ Все спейсы", kind: "back" }].concat(
+        tree[space].map(f => ({ v: f, label: shortList(f), sel: f === items[i].l, kind: "list" }))));
+    scroll.scrollTop = 0;
   };
-  openSpaces();
+
+  if (field === "w") {
+    scroll.innerHTML = rowsHtml("Исполнитель",
+      USERS.map(o => ({ v: o, label: o, sel: o === items[i].w, kind: "user" })));
+  } else {
+    showSpaces();
+  }
+
+  sheet.onclick = (e) => {
+    const opt = e.target.closest(".opt");
+    if (!opt) {
+      if (e.target === sheet) sheet.remove();
+      return;
+    }
+    const { v, kind } = opt.dataset;
+    haptic();
+    if (kind === "user") { items[i].w = v; sheet.remove(); render(); }
+    else if (kind === "space") { showLists(v); }
+    else if (kind === "back") { showSpaces(); }
+    else if (kind === "list") { items[i].l = v; sheet.remove(); render(); }
+  };
+  document.body.appendChild(sheet);
 }
 
 function esc(s) {
