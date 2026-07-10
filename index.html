@@ -153,6 +153,53 @@
   .opt:active { background: rgba(255,255,255,.06); }
   .opt.sel { color: var(--gold); }
 
+  .wk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .wk-met { background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 14px 16px; }
+  .wk-val { font-size: 26px; font-weight: 700; color: var(--gold); letter-spacing: -.5px; }
+  .wk-lab { font-size: 12px; color: var(--dim); margin-top: 2px; }
+  .wk-card { padding: 16px; margin-bottom: 12px; }
+  .wk-title { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+  .wk-sub { font-size: 11px; font-weight: 400; color: var(--dim); }
+  .wk-chart { display: flex; gap: 8px; align-items: flex-end; height: 110px; }
+  .wk-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; }
+  .wk-bar-wrap { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+  .wk-bar { width: 100%; border-radius: 6px 6px 3px 3px; background: rgba(127,132,252,.16);
+    position: relative; overflow: hidden; }
+  .wk-bar-me { position: absolute; bottom: 0; left: 0; right: 0; background: var(--gold);
+    border-radius: 0 0 3px 3px; opacity: .85; }
+  .wk-day { font-size: 11px; color: var(--dim); margin-top: 6px; }
+  .wk-cnt { font-size: 10px; color: var(--dim); opacity: .7; }
+  .wk-trow { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .wk-tname { width: 38%; font-size: 12px; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; }
+  .wk-tbar { flex: 1; height: 8px; border-radius: 4px; background: rgba(255,255,255,.05); }
+  .wk-tbar > div { height: 100%; border-radius: 4px;
+    background: linear-gradient(90deg, rgba(99,102,241,.7), var(--gold)); }
+  .wk-tn { font-size: 11px; color: var(--dim); min-width: 26px; text-align: right; }
+  .wk-done { display: flex; gap: 10px; font-size: 13px; margin-bottom: 9px; line-height: 1.35; }
+  .wk-chk { color: var(--gold); font-weight: 700; }
+  .wk-who { display: block; font-size: 11px; color: var(--dim); }
+  .wk-tone { text-align: center; }
+  .wk-tone-score { font-size: 44px; font-weight: 700; color: var(--gold); letter-spacing: -1px; }
+  .wk-tone-score span { font-size: 18px; color: var(--dim); font-weight: 500; }
+  .wk-txt { font-size: 13px; line-height: 1.5; color: rgba(255,255,255,.85); }
+  .wk-li { font-size: 13px; line-height: 1.45; color: rgba(255,255,255,.85);
+    padding-left: 14px; position: relative; margin-bottom: 8px; }
+  .wk-li::before { content: ""; position: absolute; left: 0; top: 7px; width: 5px; height: 5px;
+    border-radius: 50%; background: var(--gold); }
+
+  .sent-ov { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center;
+    background: rgba(10,11,15,.72); backdrop-filter: blur(10px);
+    animation: undoIn .25s; }
+  .sent-badge { display: flex; flex-direction: column; align-items: center; gap: 14px;
+    animation: sentPop .45s cubic-bezier(.22,.8,.3,1); }
+  .sent-check { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center;
+    font-size: 34px; color: #0a0b0f; background: var(--gold);
+    box-shadow: 0 0 40px rgba(127,132,252,.55); }
+  .sent-txt { font-size: 15px; font-weight: 600; color: #fff; letter-spacing: .2px; }
+  @keyframes sentPop { from { opacity: 0; transform: scale(.6); } }
+
   .undo { position: fixed; top: 16px; right: 16px; z-index: 80;
     width: 48px; height: 48px; border-radius: 50%; cursor: pointer;
     background: rgba(21,22,29,.94); border: 1px solid rgba(127,132,252,.55);
@@ -215,6 +262,8 @@
   <div class="hint">Пересборка анализирует только новое с прошлого раза, ~1–2 мин.<br>
   🎙 Голосовые правки: закрой редактор и просто надиктуй боту голосовое.</div>
   <div class="card stats" id="stats" style="display:none"></div>
+  <button class="ghost" id="wkbtn" onclick="askWeek()">📊 Аналитика недели</button>
+  <div class="hint" id="wkhint">Соберу последние 7 дней: статистика, закрытые таски,<br>разбор твоего общения. ~2–3 мин, пришлю кнопку с отчётом.</div>
   <div id="err" class="err"></div>
 </div>
 
@@ -585,13 +634,78 @@ tg.MainButton.onClick(() => {
     document.getElementById("err").textContent = "Слишком много правок за раз, убери часть тасков.";
     return;
   }
+  tg.MainButton.hide();
   tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
-  tg.sendData(data);
+  const ov = document.createElement("div");
+  ov.className = "sent-ov";
+  ov.innerHTML = '<div class="sent-badge"><div class="sent-check">✓</div>' +
+                 '<div class="sent-txt">Отправлено в ClickUp</div></div>';
+  document.body.appendChild(ov);
+  setTimeout(() => tg.sendData(data), 850);
 });
 
 function rerun() {
   tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
   tg.sendData(JSON.stringify({ cmd: "run" }));
+}
+
+function askWeek() {
+  tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
+  tg.sendData(JSON.stringify({ cmd: "week" }));
+}
+
+const WD = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
+
+function renderWeek(wk) {
+  const st = wk.st || {}, ai = wk.ai || {}, done = wk.done || [];
+  document.querySelector(".kicker").textContent = "Weekly · Analytics";
+  document.getElementById("h1").textContent = "Аналитика недели";
+  const days = st.days || [];
+  const period = days.length
+    ? new Date(days[0][0] + "T12:00:00").toLocaleDateString("ru", { day: "numeric", month: "short" }) +
+      " — " + new Date(days[days.length - 1][0] + "T12:00:00").toLocaleDateString("ru", { day: "numeric", month: "short" })
+    : "";
+  const met = (v, l) => `<div class="wk-met"><div class="wk-val">${v}</div><div class="wk-lab">${l}</div></div>`;
+  const maxD = Math.max(1, ...days.map(d => d[1]));
+  const bars = days.map(d => {
+    const dt = new Date(d[0] + "T12:00:00");
+    return `<div class="wk-col"><div class="wk-bar-wrap">` +
+      `<div class="wk-bar" style="height:${Math.max(4, d[1] / maxD * 100)}%">` +
+      `<div class="wk-bar-me" style="height:${d[1] ? d[2] / d[1] * 100 : 0}%"></div></div></div>` +
+      `<div class="wk-day">${WD[dt.getDay()]}</div><div class="wk-cnt">${d[1]}</div></div>`;
+  }).join("");
+  const maxT = Math.max(1, ...(st.top || []).map(t => t[1]));
+  const tops = (st.top || []).map(t =>
+    `<div class="wk-trow"><div class="wk-tname">${esc(t[0])}</div>` +
+    `<div class="wk-tbar"><div style="width:${t[1] / maxT * 100}%"></div></div>` +
+    `<div class="wk-tn">${t[1]}</div></div>`).join("");
+  const doneRows = done.map(t =>
+    `<div class="wk-done"><span class="wk-chk">✓</span><div>${esc(t[0])}` +
+    `<span class="wk-who">${esc([t[1], t[2]].filter(Boolean).join(" · "))}</span></div></div>`).join("");
+  const list = a => (a || []).map(x => `<div class="wk-li">${esc(x)}</div>`).join("");
+  const tone = typeof ai.tone === "number" ? ai.tone : parseFloat(ai.tone) || 0;
+
+  document.getElementById("app").innerHTML = `
+    <div class="kicker">Weekly · Analytics</div>
+    <h1>Аналитика недели</h1>
+    <div class="hint" style="text-align:left; margin:-6px 0 14px;">${period} · только по запросу, ничего не создаёт</div>
+    <div class="wk-grid">
+      ${met(st.tot || 0, "сообщений")}${met(st.me || 0, "твоих")}
+      ${met(st.chats || 0, "чатов")}${met(st.vc || 0, "голосовых")}
+    </div>
+    <div class="card wk-card"><div class="wk-title">Сообщения по дням <span class="wk-sub">фиолетовое — твои</span></div>
+      <div class="wk-chart">${bars}</div></div>
+    <div class="card wk-card"><div class="wk-title">Самые активные чаты</div>${tops}</div>
+    <div class="card wk-card"><div class="wk-title">Закрыто тасков: ${done.length}</div>
+      ${doneRows || '<div class="wk-li">Нет закрытых тасков за неделю</div>'}</div>
+    <div class="card wk-card wk-tone">
+      <div class="wk-tone-score">${tone ? tone + "<span>/10</span>" : "—"}</div>
+      <div class="wk-title" style="margin:0">Тон общения</div>
+      <div class="wk-txt">${esc(ai.tone_txt || "")}</div></div>
+    <div class="card wk-card"><div class="wk-title">Итог недели</div>
+      <div class="wk-txt">${esc(ai.sum || "")}</div></div>
+    <div class="card wk-card"><div class="wk-title">💪 Сильное</div>${list(ai.plus)}</div>
+    <div class="card wk-card"><div class="wk-title">🎯 Подтянуть</div>${list(ai.rec)}</div>`;
 }
 
 function renderStats() {
@@ -630,6 +744,7 @@ function renderStats() {
   } catch (e) {
     document.getElementById("err").textContent = "Не смог прочитать данные: " + e.message;
   }
+  if (payload.wk) { renderWeek(payload.wk); return; }
   USERS = payload.u && payload.u.length ? payload.u : ["Я"];
   LISTS = payload.ls && payload.ls.length ? payload.ls : ["Default"];
   if (payload.d) {
