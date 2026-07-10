@@ -271,7 +271,7 @@
   <div class="hint">Пересборка анализирует только новое с прошлого раза, ~1–2 мин.<br>
   🎙 Голосовые правки: закрой редактор и просто надиктуй боту голосовое.</div>
   <div class="card stats" id="stats" style="display:none"></div>
-  <button class="ghost" id="wkopen" style="display:none">📊 Отчёт недели</button>
+  <div id="wkinline"></div>
   <button class="ghost" id="wkbtn" onclick="askWeek()">⟳ Собрать аналитику недели</button>
   <div class="hint" id="wkhint">Статистика 7 дней, закрытые таски, разбор общения,<br>прогноз и стратегия. ~2–3 мин, пришлю кнопку с отчётом.</div>
   <div id="err" class="err"></div>
@@ -826,8 +826,8 @@ function renderStats() {
   renderStats();
   loadWeekCloud(wk => {
     if (!wk) return;
-    const b = document.getElementById("wkopen");
-    if (b) { b.style.display = ""; b.onclick = () => openWeekOverlay(wk); }
+    const box = document.getElementById("wkinline");
+    if (box) box.innerHTML = '<div style="height:26px"></div>' + weekHTML(wk);
   });
 })();
 </script>
