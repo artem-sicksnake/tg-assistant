@@ -92,14 +92,19 @@
   .sheet { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.6);
     display: flex; align-items: flex-end; animation: fadein .18s; }
   @keyframes fadein { from { opacity: 0 } }
-  .sheet-in { width: 100%; min-height: 54vh; max-height: 76vh;
+  .sheet-in { width: 100%; max-height: 78vh;
     position: relative; overflow: hidden; display: flex; flex-direction: column;
     background: #15161d; border-radius: 24px 24px 0 0;
-    animation: up .22s cubic-bezier(.22,.8,.3,1); }
-  @keyframes up { from { transform: translateY(40px); opacity: .5 } }
-  .sheet-scroll { position: relative; z-index: 1; overflow-y: auto;
+    animation: up .28s cubic-bezier(.22,.8,.3,1);
+    transition: height .55s cubic-bezier(.3,.9,.3,1); }
+  @keyframes up { from { transform: translateY(48px); opacity: .4 } }
+  .sheet-scroll { position: relative; z-index: 1; overflow-y: auto; flex: 1;
     -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
     padding: 10px 14px 44px; }
+  .sheet-scroll.anim-fwd { animation: slideFwd .4s cubic-bezier(.22,.8,.3,1); }
+  .sheet-scroll.anim-back { animation: slideBack .4s cubic-bezier(.22,.8,.3,1); }
+  @keyframes slideFwd { from { opacity: 0; transform: translateX(28px); } }
+  @keyframes slideBack { from { opacity: 0; transform: translateX(-28px); } }
   .aura { position: absolute; left: -25%; right: -25%; bottom: -18%; height: 95%;
     pointer-events: none; filter: blur(34px); opacity: 1;
     background:
@@ -109,8 +114,11 @@
     -webkit-mask-image: linear-gradient(to top, black 55%, transparent 100%);
     mask-image: linear-gradient(to top, black 55%, transparent 100%);
     animation: aura 6s ease-in-out infinite alternate;
-    transition: left .6s cubic-bezier(.22,.8,.3,1), right .6s cubic-bezier(.22,.8,.3,1); }
-  .sheet-in.lvl2 .aura { left: 30%; right: -80%; }
+    transition: left .65s cubic-bezier(.3,.9,.3,1), right .65s cubic-bezier(.3,.9,.3,1),
+                bottom .65s cubic-bezier(.3,.9,.3,1), height .65s cubic-bezier(.3,.9,.3,1); }
+  .sheet-in.lvl2 .aura { left: 48%; right: -42%; bottom: -8%; height: 118%;
+    -webkit-mask-image: linear-gradient(to left, black 45%, transparent 100%);
+    mask-image: linear-gradient(to left, black 45%, transparent 100%); }
   @keyframes aura {
     from { transform: translateX(-7%) scale(1); }
     to { transform: translateX(7%) scale(1.22) rotate(4deg); }
@@ -235,26 +243,37 @@ function openPicker(i, field) {
   const tree = listTree();
   const curSpace = () => items[i].l.includes(" / ") ? items[i].l.split(" / ")[0] : null;
 
-  const showSpaces = () => {
-    inEl.classList.remove("lvl2");
-    scroll.innerHTML = rowsHtml("Спейс ClickUp",
-      Object.keys(tree).map(s => ({ v: s, label: s, arrow: true, sel: s === curSpace(), kind: "space" })));
+  const setContent = (html, dir) => {
+    scroll.classList.remove("anim-fwd", "anim-back");
+    void scroll.offsetWidth;
+    scroll.innerHTML = html;
+    if (dir) scroll.classList.add(dir === "fwd" ? "anim-fwd" : "anim-back");
     scroll.scrollTop = 0;
-  };
-  const showLists = (space) => {
-    inEl.classList.add("lvl2");
-    scroll.innerHTML = rowsHtml(space,
-      [{ v: "__back__", label: "‹ Все спейсы", kind: "back" }].concat(
-        tree[space].map(f => ({ v: f, label: shortList(f), sel: f === items[i].l, kind: "list" }))));
-    scroll.scrollTop = 0;
+    const wh = window.innerHeight;
+    const target = Math.min(Math.max(scroll.scrollHeight + 6, wh * 0.54), wh * 0.76);
+    inEl.style.height = target + "px";
   };
 
+  const showSpaces = (dir) => {
+    inEl.classList.remove("lvl2");
+    setContent(rowsHtml("Спейс ClickUp",
+      Object.keys(tree).map(s => ({ v: s, label: s, arrow: true, sel: s === curSpace(), kind: "space" }))), dir);
+  };
+  const showLists = (space, dir) => {
+    inEl.classList.add("lvl2");
+    setContent(rowsHtml(space,
+      [{ v: "__back__", label: "‹ Все спейсы", kind: "back" }].concat(
+        tree[space].map(f => ({ v: f, label: shortList(f), sel: f === items[i].l, kind: "list" })))), dir);
+  };
+
+  inEl.style.transition = "none";
   if (field === "w") {
-    scroll.innerHTML = rowsHtml("Исполнитель",
-      USERS.map(o => ({ v: o, label: o, sel: o === items[i].w, kind: "user" })));
+    setContent(rowsHtml("Исполнитель",
+      USERS.map(o => ({ v: o, label: o, sel: o === items[i].w, kind: "user" }))), null);
   } else {
-    showSpaces();
+    showSpaces(null);
   }
+  requestAnimationFrame(() => requestAnimationFrame(() => { inEl.style.transition = ""; }));
 
   sheet.onclick = (e) => {
     const opt = e.target.closest(".opt");
@@ -265,8 +284,8 @@ function openPicker(i, field) {
     const { v, kind } = opt.dataset;
     haptic();
     if (kind === "user") { items[i].w = v; sheet.remove(); render(); }
-    else if (kind === "space") { showLists(v); }
-    else if (kind === "back") { showSpaces(); }
+    else if (kind === "space") { showLists(v, "fwd"); }
+    else if (kind === "back") { showSpaces("back"); }
     else if (kind === "list") { items[i].l = v; sheet.remove(); render(); }
   };
   document.body.appendChild(sheet);
