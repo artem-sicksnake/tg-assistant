@@ -457,7 +457,15 @@ function softRender(i, on) {
 }
 
 let removed = [];
+let hiddenPersist = []; // удалены свайпом в прошлые открытия, ещё не применены
 let undoData = null, undoTimer = null;
+
+function saveHidden() {
+  try {
+    localStorage.setItem("del:" + payload.d,
+      JSON.stringify(hiddenPersist.concat(removed)));
+  } catch (e) {}
+}
 
 function hideUndo() {
   clearTimeout(undoTimer);
@@ -472,7 +480,10 @@ function showUndo() {
   b.onclick = () => {
     if (!undoData) return;
     items.splice(Math.min(undoData.idx, items.length), 0, undoData.item);
-    if (undoData.removedN) removed = removed.filter(n => n !== undoData.removedN);
+    if (undoData.removedN) {
+      removed = removed.filter(n => n !== undoData.removedN);
+      saveHidden();
+    }
     undoData = null;
     hideUndo();
     tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
@@ -485,7 +496,7 @@ function showUndo() {
 function removeItem(i) {
   const it = items[i];
   undoData = { item: it, idx: i, removedN: (!it.manual && it.n) ? it.n : null };
-  if (!it.manual && it.n) removed.push(it.n);
+  if (!it.manual && it.n) { removed.push(it.n); saveHidden(); }
   items.splice(i, 1);
   tg.HapticFeedback && tg.HapticFeedback.impactOccurred("light");
   render();
@@ -567,7 +578,7 @@ tg.MainButton.onClick(() => {
             .map(it => ({ n: it.n, ti: it.ti.trim(), w: it.w, du: it.du, l: it.l })),
     m: items.filter(it => it.manual && sendable(it))
             .map(it => ({ ti: it.ti.trim(), w: it.w, du: it.du, l: it.l })),
-    x: removed
+    x: [...new Set(removed.concat(hiddenPersist))]
   };
   const data = JSON.stringify(out);
   if (data.length > 4000) {
@@ -629,6 +640,19 @@ function renderStats() {
     n: t.n, ti: t.ti || "", w: t.w || USERS[0], du: t.du || "",
     l: t.l || LISTS[0], on: false, manual: false, cr: t.cr || "", dirty: false
   }));
+  // не показываем таски, удалённые свайпом в прошлые открытия
+  try {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith("del:") && k !== "del:" + payload.d)
+      .forEach(k => localStorage.removeItem(k));
+    let hid = JSON.parse(localStorage.getItem("del:" + payload.d) || "[]");
+    const present = new Set(items.map(it => String(it.n)));
+    hid = hid.filter(n => present.has(String(n)));
+    hiddenPersist = hid.slice();
+    saveHidden();
+    const hs = new Set(hid.map(String));
+    items = items.filter(it => !hs.has(String(it.n)));
+  } catch (e) {}
   renderDigest();
   render(true);
   renderStats();
