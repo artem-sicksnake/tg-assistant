@@ -65,6 +65,8 @@
   .num { position: absolute; top: -9px; right: 14px; font: 600 10px/1 -apple-system, "SF Pro Text", system-ui, sans-serif;
     letter-spacing: .12em; color: var(--gold); background: #14130f;
     border: 1px solid rgba(127,132,252,.45); border-radius: 99px; padding: 5px 9px; }
+  .num.done { background: var(--gold); color: #0d0e14; border-color: var(--gold);
+    cursor: pointer; box-shadow: 0 0 14px rgba(127,132,252,.4); }
   .row1 { display: flex; gap: 12px; align-items: flex-start; }
   .chk { appearance: none; -webkit-appearance: none; flex: none; cursor: pointer;
     width: 24px; height: 24px; margin-top: 4px; border-radius: 8px;
@@ -316,7 +318,9 @@ function render() {
     div.className = "card task" + (it.on ? " sel" : "");
     div.style.animationDelay = (i * 50) + "ms";
     div.innerHTML = `
-      <div class="num">${it.manual ? "NEW" : "№ " + it.n}</div>
+      <div class="num ${it.cr ? "done" : ""}" ${it.cr && it.cr.length > 2
+        ? `onclick="tg.openLink('${esc(it.cr)}')"` : ""}>${
+        it.manual ? "NEW" : (it.cr ? "✓ № " + it.n + " · в ClickUp" : "№ " + it.n)}</div>
       <div class="row1">
         <input type="checkbox" class="chk" ${it.on ? "checked" : ""}
                onchange="items[${i}].on=this.checked; softRender(${i}, this.checked)">
@@ -425,7 +429,7 @@ function renderStats() {
   }
   items = (payload.t || []).map(t => ({
     n: t.n, ti: t.ti || "", w: t.w || USERS[0], du: t.du || "",
-    l: t.l || LISTS[0], on: false, manual: false
+    l: t.l || LISTS[0], on: false, manual: false, cr: t.cr || ""
   }));
   renderDigest();
   render();
