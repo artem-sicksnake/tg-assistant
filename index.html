@@ -153,6 +153,16 @@
   .opt:active { background: rgba(255,255,255,.06); }
   .opt.sel { color: var(--gold); }
 
+  .undo { position: fixed; top: 16px; right: 16px; z-index: 80;
+    width: 48px; height: 48px; border-radius: 50%; cursor: pointer;
+    background: rgba(21,22,29,.94); border: 1px solid rgba(127,132,252,.55);
+    color: var(--gold); font-size: 22px; display: grid; place-items: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,.55), 0 0 18px rgba(127,132,252,.25);
+    animation: undoIn .28s cubic-bezier(.22,.8,.3,1);
+    transition: opacity .25s, transform .25s; }
+  @keyframes undoIn { from { opacity: 0; transform: translateY(-14px) scale(.7); } }
+  .undo.bye { opacity: 0; transform: scale(.7); }
+
   .stats { padding: 14px 15px 16px; }
   .stats h3 { font: 600 12px/1 -apple-system, "SF Pro Text", system-ui, sans-serif; letter-spacing: .1em;
     text-transform: uppercase; margin-bottom: 14px; }
@@ -334,13 +344,19 @@ function renderDigest() {
     .join("\n");
 }
 
-function render() {
+function render(withAnim) {
   const box = document.getElementById("list");
   box.innerHTML = "";
   items.forEach((it, i) => {
     const div = document.createElement("div");
     div.className = "card task" + ((it.on || it.cr) ? " sel" : "");
-    div.style.animationDelay = (i * 50) + "ms";
+    if (withAnim) {
+      div.style.animationDelay = (i * 50) + "ms";
+    } else {
+      div.style.animation = "none";
+      div.style.opacity = "1";
+      div.style.transform = "none";
+    }
     const dirty = `items[${i}].dirty=true;`;
     div.innerHTML = `
       <div class="num ${it.cr ? "done" : ""}" ${it.cr && it.cr.length > 2
@@ -440,13 +456,39 @@ function softRender(i, on) {
 }
 
 let removed = [];
+let undoData = null, undoTimer = null;
+
+function hideUndo() {
+  clearTimeout(undoTimer);
+  const b = document.getElementById("undoBtn");
+  if (b) { b.classList.add("bye"); setTimeout(() => b.remove(), 260); }
+}
+
+function showUndo() {
+  hideUndo();
+  const b = document.createElement("button");
+  b.className = "undo"; b.id = "undoBtn"; b.textContent = "↺";
+  b.onclick = () => {
+    if (!undoData) return;
+    items.splice(Math.min(undoData.idx, items.length), 0, undoData.item);
+    if (undoData.removedN) removed = removed.filter(n => n !== undoData.removedN);
+    undoData = null;
+    hideUndo();
+    tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
+    render();
+  };
+  document.body.appendChild(b);
+  undoTimer = setTimeout(hideUndo, 4500);
+}
 
 function removeItem(i) {
   const it = items[i];
+  undoData = { item: it, idx: i, removedN: (!it.manual && it.n) ? it.n : null };
   if (!it.manual && it.n) removed.push(it.n);
   items.splice(i, 1);
   tg.HapticFeedback && tg.HapticFeedback.impactOccurred("light");
   render();
+  showUndo();
 }
 
 function addManual() {
@@ -587,7 +629,7 @@ function renderStats() {
     l: t.l || LISTS[0], on: false, manual: false, cr: t.cr || "", dirty: false
   }));
   renderDigest();
-  render();
+  render(true);
   renderStats();
 })();
 </script>
