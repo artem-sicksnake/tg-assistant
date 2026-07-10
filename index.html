@@ -124,16 +124,19 @@ function b64bytes(s) {
 }
 
 async function loadPayload() {
-  const raw = location.hash.slice(1);
-  if (!raw) return;
-  if (raw.startsWith("z:")) {
-    const stream = new Blob([b64bytes(raw.slice(2))]).stream()
+  let frag = location.hash.slice(1);
+  try { frag = decodeURIComponent(frag); } catch (e) {}
+  const m = frag.match(/(?:^|[&?])z:([A-Za-z0-9_\-]+=*)/);
+  if (m) {
+    const stream = new Blob([b64bytes(m[1])]).stream()
       .pipeThrough(new DecompressionStream("deflate"));
     const buf = await new Response(stream).arrayBuffer();
     payload = JSON.parse(new TextDecoder("utf-8").decode(buf));
-  } else {
-    payload = JSON.parse(new TextDecoder("utf-8").decode(b64bytes(raw)));
+    return;
   }
+  const legacy = frag.split("&")[0];
+  if (!legacy || legacy.startsWith("tgWebApp")) return;
+  payload = JSON.parse(new TextDecoder("utf-8").decode(b64bytes(legacy)));
 }
 
 const selHtml = (opts, val) =>
