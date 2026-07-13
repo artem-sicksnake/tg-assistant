@@ -153,6 +153,15 @@
   .opt:active { background: rgba(255,255,255,.06); }
   .opt.sel { color: var(--gold); }
 
+  .tdesc { margin: 2px 2px 10px 40px; font-size: 12.5px; line-height: 1.45;
+    color: var(--dim); cursor: pointer; position: relative;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; padding-right: 18px; transition: color .2s; }
+  .tdesc::after { content: "▾"; position: absolute; right: 2px; top: 1px;
+    font-size: 10px; color: rgba(127,132,252,.7); }
+  .tdesc.open { -webkit-line-clamp: unset; display: block; color: rgba(255,255,255,.75); }
+  .tdesc.open::after { content: "▴"; }
+
   .wk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
   .wk-met { background: var(--card); border: 1px solid var(--line); border-radius: 16px;
     padding: 14px 16px; }
@@ -272,6 +281,8 @@
   🎙 Голосовые правки: закрой редактор и просто надиктуй боту голосовое.</div>
   <div class="card stats" id="stats" style="display:none"></div>
   <div id="wkinline"></div>
+  <button class="ghost" id="tmbtn" onclick="askTime()">⏱ Аналитика времени задач</button>
+  <div class="hint">Сколько шли задачи от in progress до complete<br>за последние 7 дней. Считается ~15 сек, пришлю кнопку.</div>
   <button class="ghost" id="wkbtn" onclick="askWeek()">⟳ Собрать аналитику недели</button>
   <div class="hint" id="wkhint">Статистика 7 дней, закрытые таски, разбор общения,<br>прогноз и стратегия. ~2–3 мин, пришлю кнопку с отчётом.</div>
   <div id="err" class="err"></div>
@@ -429,6 +440,8 @@ function render(withAnim) {
         <textarea class="title" rows="2"
           oninput="items[${i}].ti=this.value; ${dirty} updateButton()">${esc(it.ti)}</textarea>
       </div>
+      ${it.de ? `<div class="tdesc" onclick="this.classList.toggle('open');
+          tg.HapticFeedback && tg.HapticFeedback.selectionChanged()">${esc(it.de)}</div>` : ""}
       <div class="meta">
         <div class="fld"><span class="flab">исполнитель</span>
           <button class="chipsel" onclick="openPicker(${i},'w')">${esc(it.w)}</button></div>
@@ -563,7 +576,7 @@ function removeItem(i) {
 }
 
 function addManual() {
-  const draft = { ti: "", w: USERS[0], du: "", l: LISTS[0] };
+  const draft = { ti: "", de: "", w: USERS[0], du: "", l: LISTS[0] };
   const sheet = document.createElement("div");
   sheet.className = "sheet top";
   sheet.innerHTML = `<div class="sheet-in">
@@ -576,6 +589,11 @@ function addManual() {
       <textarea id="nt-ti" rows="5" placeholder="Что нужно сделать…"
         style="width:100%; background:rgba(255,255,255,.05); border:1px solid var(--stroke);
         border-radius:16px; padding:14px; font:600 17px/1.4 -apple-system, system-ui, sans-serif;
+        color:var(--text); outline:none; resize:none;"></textarea>
+      <span class="flab" style="display:block; margin:14px 0 6px 4px">описание (не обязательно)</span>
+      <textarea id="nt-de" rows="3" placeholder="Детали, ссылки, критерий готовности… ИИ оформит по-русски"
+        style="width:100%; background:rgba(255,255,255,.04); border:1px solid var(--stroke);
+        border-radius:14px; padding:12px; font:400 14px/1.45 -apple-system, system-ui, sans-serif;
         color:var(--text); outline:none; resize:none;"></textarea>
       <div class="meta" style="margin-top:16px">
         <div class="fld"><span class="flab">исполнитель</span>
@@ -599,12 +617,14 @@ function addManual() {
     this.classList.toggle("empty", !this.value);
   };
   sheet.querySelector("#nt-ti").oninput = function () { draft.ti = this.value; };
+  sheet.querySelector("#nt-de").oninput = function () { draft.de = this.value; };
   sheet.querySelector("#nt-add").onclick = () => {
     if (!draft.ti.trim()) {
       sheet.querySelector("#nt-ti").focus();
       return;
     }
-    items.push({ n: 0, ti: draft.ti.trim(), w: draft.w, du: draft.du, l: draft.l,
+    items.push({ n: 0, ti: draft.ti.trim(), de: draft.de.trim(),
+                 w: draft.w, du: draft.du, l: draft.l,
                  on: true, manual: true, dirty: false, cr: "" });
     tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
     sheet.remove();
@@ -636,7 +656,8 @@ tg.MainButton.onClick(() => {
     t: items.filter(it => !it.manual && sendable(it))
             .map(it => ({ n: it.n, ti: it.ti.trim(), w: it.w, du: it.du, l: it.l })),
     m: items.filter(it => it.manual && sendable(it))
-            .map(it => ({ ti: it.ti.trim(), w: it.w, du: it.du, l: it.l })),
+            .map(it => ({ ti: it.ti.trim(), w: it.w, du: it.du, l: it.l,
+                          ...(it.de ? { de: it.de.slice(0, 800) } : {}) })),
     x: [...new Set(removed.concat(hiddenPersist))]
   };
   const data = JSON.stringify(out);
@@ -662,6 +683,42 @@ function rerun() {
 function askWeek() {
   tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
   tg.sendData(JSON.stringify({ cmd: "week" }));
+}
+
+function askTime() {
+  tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
+  tg.sendData(JSON.stringify({ cmd: "time" }));
+}
+
+function fmtMin(m) {
+  if (m >= 1440) return Math.floor(m / 1440) + "д " + Math.floor(m % 1440 / 60) + "ч";
+  if (m >= 60) return Math.floor(m / 60) + "ч " + (m % 60) + "м";
+  return m + "м";
+}
+
+function renderTime(tm) {
+  const met = (v, l) => `<div class="wk-met"><div class="wk-val">${v}</div><div class="wk-lab">${l}</div></div>`;
+  const maxA = Math.max(1, ...(tm.ls || []).map(x => x[2]));
+  const proj = (tm.ls || []).map(x =>
+    `<div class="wk-trow"><div class="wk-tname">${esc(x[0])}</div>` +
+    `<div class="wk-tbar"><div style="width:${x[2] / maxA * 100}%"></div></div>` +
+    `<div class="wk-tn" style="min-width:52px">${fmtMin(x[2])}</div></div>` +
+    `<div class="wk-who" style="margin:-6px 0 8px 2px">${x[1]} задач${x[1] === 1 ? "а" : ""}</div>`).join("");
+  const tops = (tm.top || []).map(x =>
+    `<div class="wk-done"><span class="wk-chk" style="color:#e8734a">⏱</span>` +
+    `<div style="flex:1">${esc(x[0])}<span class="wk-who">${esc(x[2] || "")}</span></div>` +
+    `<b style="font-size:13px; white-space:nowrap">${fmtMin(x[1])}</b></div>`).join("");
+  document.getElementById("app").innerHTML = `
+    <div class="kicker">Weekly · Task Timing</div>
+    <h1>Время задач</h1>
+    <div class="hint" style="text-align:left; margin:-6px 0 14px;">in progress → complete, закрытые за 7 дней</div>
+    <div class="wk-grid">
+      ${met(tm.n || 0, "закрыто задач")}${met(tm.t || 0, "с трекингом")}
+      ${met(fmtMin(tm.avg || 0), "среднее время")}${met(tm.fast ? fmtMin(tm.fast[1]) : "—", "самая быстрая")}
+    </div>
+    <div class="card wk-card"><div class="wk-title">По проектам <span class="wk-sub">среднее время выполнения</span></div>${proj || '<div class="wk-li">нет данных</div>'}</div>
+    <div class="card wk-card"><div class="wk-title">Самые долгие</div>${tops || '<div class="wk-li">нет данных</div>'}</div>
+    ${tm.skip ? `<div class="hint" style="text-align:left">${tm.skip} задач закрыты без прохождения через in progress — они не в статистике. Чтобы время трекалось, двигай таску в in progress, когда берёшь в работу.</div>` : ""}`;
 }
 
 const WD = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
@@ -798,6 +855,7 @@ function renderStats() {
     document.getElementById("err").textContent = "Не смог прочитать данные: " + e.message;
   }
   if (payload.wk) { saveWeekCloud(payload.wk); renderWeek(payload.wk); return; }
+  if (payload.tm) { renderTime(payload.tm); return; }
   USERS = payload.u && payload.u.length ? payload.u : ["Я"];
   LISTS = payload.ls && payload.ls.length ? payload.ls : ["Default"];
   if (payload.d) {
@@ -806,7 +864,8 @@ function renderStats() {
   }
   items = (payload.t || []).map(t => ({
     n: t.n, ti: t.ti || "", w: t.w || USERS[0], du: t.du || "",
-    l: t.l || LISTS[0], on: false, manual: false, cr: t.cr || "", dirty: false
+    l: t.l || LISTS[0], de: t.de || "",
+    on: false, manual: false, cr: t.cr || "", dirty: false
   }));
   // не показываем таски, удалённые свайпом в прошлые открытия
   try {
