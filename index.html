@@ -153,10 +153,18 @@
   .opt:active { background: rgba(255,255,255,.06); }
   .opt.sel { color: var(--gold); }
 
-  .num.cs-prog { background: rgba(235,160,60,.14); border-color: rgba(235,160,60,.6);
-    color: #f2b169; box-shadow: 0 0 10px rgba(235,160,60,.2); }
-  .num.cs-done { background: rgba(80,205,125,.12); border-color: rgba(80,205,125,.55);
-    color: #6bdb95; box-shadow: 0 0 10px rgba(80,205,125,.2); }
+  .num.cs-prog, .task.sel .num.cs-prog {
+    background: rgba(235,160,60,.16); border-color: rgba(235,160,60,.65);
+    color: #f2b169; box-shadow: 0 0 12px rgba(235,160,60,.28); }
+  .num.cs-done, .task.sel .num.cs-done {
+    background: rgba(80,205,125,.14); border-color: rgba(80,205,125,.6);
+    color: #6bdb95; box-shadow: 0 0 12px rgba(80,205,125,.28); }
+  .task.csc-prog .chk-done { border-color: rgba(235,160,60,.65); color: #f2b169;
+    background: rgba(235,160,60,.12); }
+  .task.csc-done .chk-done { border-color: rgba(80,205,125,.6); color: #6bdb95;
+    background: rgba(80,205,125,.1); }
+  .task.sel.csc-done { border-color: rgba(80,205,125,.4); }
+  .task.sel.csc-prog { border-color: rgba(235,160,60,.45); }
 
   .tdesc { margin: 2px 2px 10px 40px; font-size: 12.5px; line-height: 1.45;
     color: var(--dim); cursor: pointer; position: relative;
@@ -424,7 +432,11 @@ function render(withAnim) {
   box.innerHTML = "";
   items.forEach((it, i) => {
     const div = document.createElement("div");
-    div.className = "card task" + ((it.on || it.cr) ? " sel" : "");
+    const csCard = it.cs
+      ? (/(complete|closed|done|готов)/i.test(it.cs) ? " csc-done"
+         : /(progress|работ|дела)/i.test(it.cs) ? " csc-prog" : "")
+      : "";
+    div.className = "card task" + ((it.on || it.cr) ? " sel" : "") + csCard;
     if (withAnim) {
       div.style.animationDelay = (i * 50) + "ms";
     } else {
