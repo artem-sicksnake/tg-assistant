@@ -153,6 +153,11 @@
   .opt:active { background: rgba(255,255,255,.06); }
   .opt.sel { color: var(--gold); }
 
+  .num.cs-prog { background: rgba(235,160,60,.14); border-color: rgba(235,160,60,.6);
+    color: #f2b169; box-shadow: 0 0 10px rgba(235,160,60,.2); }
+  .num.cs-done { background: rgba(80,205,125,.12); border-color: rgba(80,205,125,.55);
+    color: #6bdb95; box-shadow: 0 0 10px rgba(80,205,125,.2); }
+
   .tdesc { margin: 2px 2px 10px 40px; font-size: 12.5px; line-height: 1.45;
     color: var(--dim); cursor: pointer; position: relative;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
@@ -428,10 +433,16 @@ function render(withAnim) {
       div.style.transform = "none";
     }
     const dirty = `items[${i}].dirty=true;`;
+    const csCls = it.cs
+      ? (/(complete|closed|done|готов)/i.test(it.cs) ? " cs-done"
+         : /(progress|работ|дела)/i.test(it.cs) ? " cs-prog" : "")
+      : "";
+    const pill = it.manual ? "NEW"
+      : it.cr ? (it.cs ? "№ " + it.n + " · " + esc(it.cs) : "✓ № " + it.n + " · в ClickUp")
+      : "№ " + it.n;
     div.innerHTML = `
-      <div class="num ${it.cr ? "done" : ""}" ${it.cr && it.cr.length > 2
-        ? `onclick="tg.openLink('${esc(it.cr)}')"` : ""}>${
-        it.manual ? "NEW" : (it.cr ? "✓ № " + it.n + " · в ClickUp" : "№ " + it.n)}</div>
+      <div class="num ${it.cr ? "done" : ""}${csCls}" ${it.cr && it.cr.length > 2
+        ? `onclick="tg.openLink('${esc(it.cr)}')"` : ""}>${pill}</div>
       <div class="row1">
         ${it.cr
           ? `<div class="chk-done">✓</div>`
@@ -874,7 +885,7 @@ function renderStats() {
   }
   items = (payload.t || []).map(t => ({
     n: t.n, ti: t.ti || "", w: t.w || USERS[0], du: t.du || "",
-    l: t.l || LISTS[0], de: t.de || "",
+    l: t.l || LISTS[0], de: t.de || "", cs: t.cs || "",
     on: false, manual: false, cr: t.cr || "", dirty: false
   }));
   // не показываем таски, удалённые свайпом в прошлые открытия
