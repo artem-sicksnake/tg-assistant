@@ -696,29 +696,39 @@ function fmtMin(m) {
   return m + "м";
 }
 
-function renderTime(tm) {
-  const met = (v, l) => `<div class="wk-met"><div class="wk-val">${v}</div><div class="wk-lab">${l}</div></div>`;
-  const maxA = Math.max(1, ...(tm.ls || []).map(x => x[2]));
-  const proj = (tm.ls || []).map(x =>
+function timeSection(title, sub, d) {
+  if (!d) return "";
+  const maxA = Math.max(1, ...(d.ls || []).map(x => x[2]));
+  const proj = (d.ls || []).map(x =>
     `<div class="wk-trow"><div class="wk-tname">${esc(x[0])}</div>` +
     `<div class="wk-tbar"><div style="width:${x[2] / maxA * 100}%"></div></div>` +
     `<div class="wk-tn" style="min-width:52px">${fmtMin(x[2])}</div></div>` +
-    `<div class="wk-who" style="margin:-6px 0 8px 2px">${x[1]} задач${x[1] === 1 ? "а" : ""}</div>`).join("");
-  const tops = (tm.top || []).map(x =>
+    `<div class="wk-who" style="margin:-6px 0 8px 2px">${x[1]} задач${x[1] === 1 ? "а" : ""} · сред.</div>`).join("");
+  const tops = (d.top || []).map(x =>
     `<div class="wk-done"><span class="wk-chk" style="color:#e8734a">⏱</span>` +
     `<div style="flex:1">${esc(x[0])}<span class="wk-who">${esc(x[2] || "")}</span></div>` +
     `<b style="font-size:13px; white-space:nowrap">${fmtMin(x[1])}</b></div>`).join("");
+  return `<div class="card wk-card"><div class="wk-title">${title} <span class="wk-sub">${sub}</span></div>
+    ${proj || '<div class="wk-li">нет данных</div>'}
+    <div class="wk-title" style="margin-top:14px">Самые долгие</div>${tops}</div>`;
+}
+
+function renderTime(tm) {
+  const met = (v, l) => `<div class="wk-met"><div class="wk-val">${v}</div><div class="wk-lab">${l}</div></div>`;
+  const hasTrack = !!(tm.t && tm.ls);
   document.getElementById("app").innerHTML = `
     <div class="kicker">Weekly · Task Timing</div>
     <h1>Время задач</h1>
-    <div class="hint" style="text-align:left; margin:-6px 0 14px;">in progress → complete, закрытые за 7 дней</div>
+    <div class="hint" style="text-align:left; margin:-6px 0 14px;">закрытые за последние 7 дней</div>
     <div class="wk-grid">
-      ${met(tm.n || 0, "закрыто задач")}${met(tm.t || 0, "с трекингом")}
-      ${met(fmtMin(tm.avg || 0), "среднее время")}${met(tm.fast ? fmtMin(tm.fast[1]) : "—", "самая быстрая")}
+      ${met(tm.n || 0, "закрыто задач")}${met(tm.t || 0, "с точным трекингом")}
+      ${met(hasTrack ? fmtMin(tm.avg) : "—", "среднее in progress")}${met(tm.cy ? fmtMin(tm.cy.avg) : "—", "средний цикл жизни")}
     </div>
-    <div class="card wk-card"><div class="wk-title">По проектам <span class="wk-sub">среднее время выполнения</span></div>${proj || '<div class="wk-li">нет данных</div>'}</div>
-    <div class="card wk-card"><div class="wk-title">Самые долгие</div>${tops || '<div class="wk-li">нет данных</div>'}</div>
-    ${tm.skip ? `<div class="hint" style="text-align:left">${tm.skip} задач закрыты без прохождения через in progress — они не в статистике. Чтобы время трекалось, двигай таску в in progress, когда берёшь в работу.</div>` : ""}`;
+    ${hasTrack
+      ? timeSection("⏱ In progress → complete", "точный трекер бота", tm)
+      : `<div class="card wk-card"><div class="wk-title">⏱ In progress → complete</div>
+          <div class="wk-txt">Точный трекинг включён и копится автоматически: бот проверяет статусы каждые 5 минут. Первые данные появятся, как только закроются задачи, побывавшие в in progress. ClickUp на бесплатном тарифе историю статусов не отдаёт, поэтому прошлые недели восстановить нельзя.</div></div>`}
+    ${timeSection("📦 От создания до закрытия", "сколько таска живёт в списке", tm.cy)}`;
 }
 
 const WD = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
